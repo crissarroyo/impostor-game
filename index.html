@@ -153,7 +153,7 @@
     </div>
 
     <!-- Versión Beta -->
-    <div class="version">beta 0.8.4.9</div>
+    <div class="version">beta 0.8.4.10</div>
 
     <script>
         const DB = {
@@ -321,6 +321,8 @@
                             fullRoles = msg.roles;
                             updateSpectatorRoles();
                         }
+                    } else if (msg.type === "config") {
+                        maxPlayers = msg.maxPlayers;
                     }
                 },
                 presence: (p) => {
@@ -333,6 +335,7 @@
             pubnub.subscribe({ channels: [channel], withPresence: true });
 
             if (isHost) {
+                pubnub.publish({ channel: channel, message: { type: "config", maxPlayers: maxPlayers } });
                 const qr = qrcode(0, 'M');
                 const baseUrl = window.location.origin + window.location.pathname;
                 qr.addData(baseUrl + "?room=" + channel);
@@ -407,20 +410,20 @@
                 citizens.push(id);
             });
 
-            activePlayers = Object.keys(roles);
+            activePlayers = [...players];
             fullRoles = roles;
             pubnub.publish({ channel: channel, message: { type: "assign", roles: roles, activePlayers: activePlayers } });
         }
 
         function handleAssignRoles(msg) {
             const data = msg.roles[myId];
+            activePlayers = msg.activePlayers || [];
             if (data) {
                 myRole = data;
                 localStorage.setItem('myRole', JSON.stringify(myRole));
                 document.getElementById('my-icon').innerText = data.icon;
                 document.getElementById('my-role').innerText = data.role;
                 document.getElementById('my-word').innerText = data.word;
-                activePlayers = msg.activePlayers;
                 showScreen('role-screen');
                 gamePhase = 'roles';
                 if (isHost) document.getElementById('host-start-timer').style.display = 'block';
@@ -578,6 +581,8 @@
         function checkGameOver() {
             if (impostors.length === 0) {
                 pubnub.publish({ channel: channel, message: { type: "game_over", winner: "Ciudadanos" } });
+            } else if (activePlayers.length <= 2 && impostors.length > 0) {
+                pubnub.publish({ channel: channel, message: { type: "game_over", winner: "Impostores" } });
             }
         }
 
