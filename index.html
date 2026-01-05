@@ -24,6 +24,8 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         ul.player-list { list-style: none; padding: 0; font-size: 0.9rem; opacity: 0.8; }
         ul.player-list li { margin: 5px 0; }
+        /* Versión Beta */
+        .version { position: fixed; bottom: 10px; right: 10px; color: var(--text); opacity: 0.5; font-size: 0.8rem; z-index: 1000; }
     </style>
 </head>
 <body>
@@ -80,6 +82,9 @@
         </div>
     </div>
 
+    <!-- Versión Beta -->
+    <div class="version">beta 0.8.4.1</div>
+
     <script>
         const DB = {
             "Animales 🦁": ["León", "Tigre", "Elefante", "Cebra", "Delfín", "Lobo", "Gorila", "Águila"],
@@ -109,8 +114,8 @@
             document.getElementById('spinner').style.display = 'block';  // Mostrar spinner
 
             pubnub = new PubNub({
-                publishKey: 'pub-c-4638a1f8-084b-449e-b996-039c381f887f',
-                subscribeKey: 'sub-c-10902830-67c8-4721-91a9-d65e23616618',
+                publishKey: 'demo',  // Clave demo para testing
+                subscribeKey: 'demo',  // Clave demo para testing
                 userId: myId
             });
 
