@@ -29,6 +29,9 @@
         /* Voting */
         .vote-btn { background: #3b82f6; color: white; border: none; padding: 8px; border-radius: 8px; margin-left: 10px; cursor: pointer; }
         .voted { background: #22c55e; }
+        /* Results */
+        .results-bar { background: #475569; height: 20px; margin: 5px 0; border-radius: 5px; }
+        .results-fill { background: var(--accent); height: 100%; border-radius: 5px; }
     </style>
 </head>
 <body>
@@ -46,12 +49,12 @@
         </div>
 
         <div id="lobby-screen" class="screen">
-            <h2 id="lobby-title" style="text-align: center;">Sala de Espera</h2>
+            <h2 id="lobby-title" style="text-align: center;">Sala de Espera 🏟️</h2>
             <div class="setup-box" style="text-align: center;">
                 <div class="room-code" id="display-code">----</div>
                 <div id="qrcode"></div>
                 <div id="spinner" class="spinner"></div>
-                <p id="player-count" style="font-weight: bold;">Jugadores conectados: 0</p>
+                <p id="player-count" style="font-weight: bold;">Jugadores conectados: 0 👥</p>
                 <ul id="player-list" class="player-list"></ul>
             </div>
 
@@ -60,7 +63,7 @@
                     <label>📏 Máx Jugadores: <input type="number" id="max-players" value="10" min="3" max="20" class="input-dark" style="width: 50px;"></label><br><br>
                     <label>😈 Impostores: <input type="number" id="num-imp" value="1" min="1" class="input-dark" style="width: 50px;"></label><br><br>
                     <label>🤡 Charlatanes: <input type="number" id="num-char" value="0" min="0" class="input-dark" style="width: 50px;"></label><br><br>
-                    <label>⏱ Tiempo: 
+                    <label>⏱ Tiempo por Ronda: 
                         <select id="round-time" class="input-dark" style="width: 100px;">
                             <option value="30">30 seg</option>
                             <option value="60">1 min</option>
@@ -73,41 +76,54 @@
         </div>
 
         <div id="role-screen" class="screen">
-            <h3>Toca para ver tu rol:</h3>
+            <h3>Toca para ver tu rol: ❓</h3>
             <div class="card" id="my-card" onclick="this.style.filter='none'">
                 <div id="my-icon" style="font-size:80px">❓</div>
                 <h2 id="my-role">SECRET</h2>
                 <div id="my-word" class="word"></div>
             </div>
-            <p id="wait-host">Espera a que el host inicie el tiempo.</p>
-            <div id="host-start-timer" style="display:none"><button class="btn-main" onclick="startTimer()">¡INICIAR TIMER! ⏱</button></div>
+            <p id="wait-host">Espera a que el host inicie la ronda... ⏳</p>
+            <div id="host-start-timer" style="display:none"><button class="btn-main" onclick="startRound()">¡INICIAR RONDA! ⏱</button></div>
             <div id="timer-display" class="timer" style="display:none">00:00</div>
-            <button class="btn-main" onclick="exitGame()" style="background:#475569">SALIR</button>
+            <button class="btn-main" onclick="exitGame()" style="background:#475569">SALIR 🚪</button>
         </div>
 
         <div id="voting-screen" class="screen">
-            <h2>¡Vota por el Impostor!</h2>
+            <h2>¡Vota por el Sospechoso! 🗳️</h2>
             <div class="setup-box">
                 <ul id="vote-list" class="player-list"></ul>
-                <p id="vote-status">Espera a que todos voten...</p>
+                <p id="vote-status">Espera a que todos voten... ⏱</p>
             </div>
-            <button class="btn-main" onclick="exitGame()" style="background:#475569">SALIR</button>
-            <div id="host-results" style="display:none"><button class="btn-main" onclick="publishResults()">MOSTRAR RESULTADOS</button></div>
+            <button class="btn-main" onclick="exitGame()" style="background:#475569">SALIR 🚪</button>
         </div>
 
         <div id="results-screen" class="screen">
-            <h2>Resultados de Votos</h2>
+            <h2>Resultados de Votos 📊</h2>
             <div class="setup-box">
                 <ul id="results-list" class="player-list"></ul>
                 <p id="most-voted"></p>
             </div>
-            <button class="btn-main" onclick="exitGame()">SALIR</button>
-            <div id="host-restart" style="display:none"><button class="btn-main" style="background:#22c55e" onclick="restartGame()">REINICIAR SALA</button></div>
+            <button class="btn-main" onclick="exitGame()" style="background:#475569">SALIR 🚪</button>
+            <div id="host-next-round" style="display:none"><button class="btn-main" style="background:#22c55e" onclick="nextRound()">SIGUIENTE RONDA 🔄</button></div>
+        </div>
+
+        <div id="spectator-screen" class="screen">
+            <h2>Modo Espectador 👀</h2>
+            <p>Has sido expulsado, pero puedes seguir viendo el juego.</p>
+            <div id="spectator-status"></div>
+            <button class="btn-main" onclick="exitGame()" style="background:#475569">SALIR 🚪</button>
+        </div>
+
+        <div id="game-over-screen" class="screen">
+            <h2>¡Juego Terminado! 🎉</h2>
+            <p id="game-result"></p>
+            <button class="btn-main" onclick="exitGame()" style="background:#475569">SALIR 🚪</button>
+            <div id="host-restart" style="display:none"><button class="btn-main" style="background:#22c55e" onclick="restartGame()">REINICIAR SALA 🔄</button></div>
         </div>
     </div>
 
     <!-- Versión Beta -->
-    <div class="version">beta 0.8.4.2</div>
+    <div class="version">beta 0.8.4.3</div>
 
     <script>
         const DB = {
@@ -117,8 +133,9 @@
         };
 
         let pubnub, channel, isHost = false, myId = localStorage.getItem('myId') || "P-" + Math.floor(Math.random() * 999999), playerName = localStorage.getItem('playerName') || "";
-        let players = [], playersMap = {}, refreshInterval, myRole = {}, votes = {}, votedPlayers = new Set(), timerInterval;
-        let gamePhase = 'lobby'; // lobby, roles, timer, voting, results
+        let players = [], playersMap = {}, activePlayers = [], refreshInterval, myRole = {}, votes = {}, votedPlayers = new Set(), timerInterval;
+        let gamePhase = 'lobby'; // lobby, roles, round, voting, results
+        let impostors = [], charlatans = [], citizens = [], eliminated = [], roundTime = 60, isSpectator = false;
 
         // Chequear reconexión al load
         window.addEventListener('load', () => {
@@ -182,29 +199,22 @@
                 message: (m) => {
                     const msg = m.message;
                     if (msg.type === "assign") {
-                        const data = msg.roles[myId];
-                        if (data) {
-                            myRole = data;
-                            localStorage.setItem('myRole', JSON.stringify(myRole));
-                            document.getElementById('my-icon').innerText = data.icon;
-                            document.getElementById('my-role').innerText = data.role;
-                            document.getElementById('my-word').innerText = data.word;
-                            showScreen('role-screen');
-                            gamePhase = 'roles';
-                            if (isHost) document.getElementById('host-start-timer').style.display = 'block';
-                            else document.getElementById('wait-host').style.display = 'block';
-                        }
-                    } else if (msg.type === "start_timer") {
+                        handleAssignRoles(msg);
+                    } else if (msg.type === "start_round") {
                         startLocalTimer(msg.time);
-                        gamePhase = 'timer';
+                        gamePhase = 'round';
                     } else if (msg.type === "vote") {
                         if (isHost) {
                             votes[msg.target] = (votes[msg.target] || 0) + 1;
                             votedPlayers.add(m.publisher);
-                            if (votedPlayers.size === players.length) publishResults();
+                            if (votedPlayers.size === activePlayers.length) publishResults();
                         }
                     } else if (msg.type === "results") {
-                        showResults(msg.votes, msg.mostVoted);
+                        showResults(msg.votes, msg.mostVoted, msg.eliminated);
+                    } else if (msg.type === "next_round") {
+                        nextRoundClient();
+                    } else if (msg.type === "game_over") {
+                        gameOver(msg.winner);
                     } else if (msg.type === "restart") {
                         location.reload();
                     } else if (msg.type === "sync") {
@@ -263,7 +273,7 @@
                         map[o.uuid] = o.state ? o.state.name : o.uuid;
                         return map;
                     }, {});
-                    document.getElementById('player-count').innerText = "Jugadores conectados: " + players.length;
+                    document.getElementById('player-count').innerText = "Jugadores conectados: " + players.length + " 👥";
                     const listEl = document.getElementById('player-list');
                     listEl.innerHTML = '';
                     Object.values(playersMap).forEach(name => {
@@ -271,6 +281,7 @@
                         li.innerText = name;
                         listEl.appendChild(li);
                     });
+                    if (gamePhase !== 'lobby') updateActivePlayers();
                 } else {
                     console.error("Error en hereNow:", s);
                 }
@@ -281,7 +292,7 @@
             if (players.length < 3) alert("Para testing ok, pero ideal ≥3 jugadores");
             const nImp = parseInt(document.getElementById('num-imp').value);
             const nChar = parseInt(document.getElementById('num-char').value);
-            const time = parseInt(document.getElementById('round-time').value);
+            roundTime = parseInt(document.getElementById('round-time').value);
 
             if (nImp + nChar > players.length) return alert("Impostores + Charlatanes no pueden exceder jugadores (" + players.length + ")");
 
@@ -293,25 +304,46 @@
 
             let roles = {};
             let pool = [...players];
+            impostors = [];
+            charlatans = [];
+            citizens = [];
 
             for(let i=0; i<nImp && pool.length; i++) {
                 let id = pool.splice(Math.floor(Math.random()*pool.length), 1)[0];
                 roles[id] = { role: "IMPOSTOR", icon: "😈", word: "Cat: " + cat };
+                impostors.push(id);
             }
             for(let i=0; i<nChar && pool.length; i++) {
                 let id = pool.splice(Math.floor(Math.random()*pool.length), 1)[0];
                 roles[id] = { role: "CHARLATÁN", icon: "🤡", word: fake };
+                charlatans.push(id);
             }
             pool.forEach(id => {
                 roles[id] = { role: "CIUDADANO", icon: "😇", word: secret };
+                citizens.push(id);
             });
 
+            activePlayers = [...players];
             pubnub.publish({ channel: channel, message: { type: "assign", roles: roles } });
         }
 
-        function startTimer() {
-            const time = parseInt(document.getElementById('round-time').value);
-            pubnub.publish({ channel: channel, message: { type: "start_timer", time: time } });
+        function handleAssignRoles(msg) {
+            const data = msg.roles[myId];
+            if (data) {
+                myRole = data;
+                localStorage.setItem('myRole', JSON.stringify(myRole));
+                document.getElementById('my-icon').innerText = data.icon;
+                document.getElementById('my-role').innerText = data.role;
+                document.getElementById('my-word').innerText = data.word;
+                showScreen('role-screen');
+                gamePhase = 'roles';
+                if (isHost) document.getElementById('host-start-timer').style.display = 'block';
+                else document.getElementById('wait-host').style.display = 'block';
+            }
+        }
+
+        function startRound() {
+            pubnub.publish({ channel: channel, message: { type: "start_round", time: roundTime } });
             document.getElementById('host-start-timer').style.display = 'none';
         }
 
@@ -325,7 +357,7 @@
                 document.getElementById('timer-display').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
                 if (--timer < 0) {
                     clearInterval(timerInterval);
-                    document.getElementById('timer-display').innerText = "¡TIEMPO!";
+                    document.getElementById('timer-display').innerText = "¡TIEMPO! ⏰";
                     if(navigator.vibrate) navigator.vibrate([500, 200, 500]);
                     startVoting();
                 }
@@ -333,31 +365,35 @@
         }
 
         function startVoting() {
+            if (isSpectator) {
+                showScreen('spectator-screen');
+                document.getElementById('spectator-status').innerText = "Espera resultados de votación... 🗳️";
+                return;
+            }
             showScreen('voting-screen');
             gamePhase = 'voting';
             votes = {};
             votedPlayers = new Set();
             const voteList = document.getElementById('vote-list');
             voteList.innerHTML = '';
-            players.forEach(id => {
-                if (id === myId) return;
+            activePlayers.forEach(id => {
+                if (id === myId || eliminated.includes(id)) return;
                 const li = document.createElement('li');
                 li.innerText = playersMap[id];
                 const btn = document.createElement('button');
                 btn.classList.add('vote-btn');
-                btn.innerText = 'Votar';
+                btn.innerText = 'Votar 🗳️';
                 btn.onclick = () => sendVote(id, btn);
                 li.appendChild(btn);
                 voteList.appendChild(li);
             });
-            if (isHost) document.getElementById('host-results').style.display = 'block';
-            setTimeout(() => { if (isHost && votedPlayers.size < players.length) publishResults(); }, 30000);
+            setTimeout(() => { if (isHost && votedPlayers.size < activePlayers.length) publishResults(); }, 30000);
         }
 
         function sendVote(target, btn) {
             pubnub.publish({ channel: channel, message: { type: "vote", target: target } });
             btn.classList.add('voted');
-            btn.innerText = 'Votado';
+            btn.innerText = 'Votado ✅';
             btn.disabled = true;
             console.log("Voto enviado a", target);
         }
@@ -372,20 +408,69 @@
                     mostVoted.push(id);
                 }
             });
-            pubnub.publish({ channel: channel, message: { type: "results", votes: votes, mostVoted: mostVoted.map(id => playersMap[id]).join(', ') } });
+            const eliminatedId = mostVoted[Math.floor(Math.random() * mostVoted.length)]; // Si empate, random
+            eliminated.push(eliminatedId);
+            activePlayers = activePlayers.filter(id => id !== eliminatedId);
+            const isImpostor = impostors.includes(eliminatedId);
+            impostors = impostors.filter(id => id !== eliminatedId);
+            charlatans = charlatans.filter(id => id !== eliminatedId);
+            citizens = citizens.filter(id => id !== eliminatedId);
+            pubnub.publish({ channel: channel, message: { type: "results", votes: votes, mostVoted: playersMap[eliminatedId], eliminated: eliminatedId, isImpostor: isImpostor } });
+            checkGameOver();
         }
 
-        function showResults(votesData, mostVoted) {
+        function showResults(votesData, mostVoted, eliminatedId) {
             showScreen('results-screen');
             gamePhase = 'results';
             const resultsList = document.getElementById('results-list');
             resultsList.innerHTML = '';
+            const maxVotes = Math.max(...Object.values(votesData), 1); // Evitar división por 0
             Object.keys(votesData).forEach(id => {
                 const li = document.createElement('li');
-                li.innerText = `${playersMap[id]}: ${votesData[id]} votos`;
+                li.innerText = `${playersMap[id]}: ${votesData[id]} votos 🗳️`;
+                const bar = document.createElement('div');
+                bar.classList.add('results-bar');
+                const fill = document.createElement('div');
+                fill.classList.add('results-fill');
+                fill.style.width = `${(votesData[id] / maxVotes) * 100}%`;
+                bar.appendChild(fill);
+                li.appendChild(bar);
                 resultsList.appendChild(li);
             });
-            document.getElementById('most-voted').innerText = `Más votado: ${mostVoted}`;
+            document.getElementById('most-voted').innerText = `Expulsado: ${mostVoted} ${impostors.includes(eliminatedId) ? '😈 (Impostor)' : '😇 (Ciudadano)'} `;
+            if (myId === eliminatedId) {
+                isSpectator = true;
+                showScreen('spectator-screen');
+                document.getElementById('spectator-status').innerText = `Has sido expulsado ${impostors.includes(myId) ? '😈' : '😇'}. Observa el juego.`;
+            }
+            if (isHost && impostors.length > 0) document.getElementById('host-next-round').style.display = 'block';
+        }
+
+        function nextRound() {
+            pubnub.publish({ channel: channel, message: { type: "next_round" } });
+        }
+
+        function nextRoundClient() {
+            showScreen('role-screen');
+            document.getElementById('timer-display').style.display = 'none';
+            document.getElementById('wait-host').style.display = 'block';
+            if (isHost) document.getElementById('host-start-timer').style.display = 'block';
+            if (isSpectator) {
+                showScreen('spectator-screen');
+                document.getElementById('spectator-status').innerText = "Espera nueva ronda... ⏳";
+            }
+            gamePhase = 'roles';
+        }
+
+        function checkGameOver() {
+            if (impostors.length === 0) {
+                pubnub.publish({ channel: channel, message: { type: "game_over", winner: "Ciudadanos" } });
+            }
+        }
+
+        function gameOver(winner) {
+            showScreen('game-over-screen');
+            document.getElementById('game-result').innerText = `¡${winner} ganan! ${winner === 'Ciudadanos' ? '😇' : '😈'}`;
             if (isHost) document.getElementById('host-restart').style.display = 'block';
         }
 
@@ -401,26 +486,33 @@
         function handleSync(msg) {
             if (msg.type === "sync") {
                 gamePhase = msg.phase;
-                if (gamePhase === 'roles' || gamePhase === 'timer') {
+                activePlayers = msg.activePlayers;
+                eliminated = msg.eliminated;
+                impostors = msg.impostors;
+                isSpectator = eliminated.includes(myId);
+                if (gamePhase === 'roles' || gamePhase === 'round') {
                     myRole = JSON.parse(localStorage.getItem('myRole')) || {};
                     if (myRole.role) {
                         document.getElementById('my-icon').innerText = myRole.icon;
                         document.getElementById('my-role').innerText = myRole.role;
                         document.getElementById('my-word').innerText = myRole.word;
                         showScreen('role-screen');
-                        if (gamePhase === 'timer') startLocalTimer(msg.remainingTime);
+                        if (gamePhase === 'round') startLocalTimer(msg.remainingTime);
                         if (isHost && gamePhase === 'roles') document.getElementById('host-start-timer').style.display = 'block';
                     }
                 } else if (gamePhase === 'voting') {
                     startVoting();
                 } else if (gamePhase === 'results') {
-                    showResults(msg.votes, msg.mostVoted);
+                    showResults(msg.votes, msg.mostVoted, msg.eliminated);
+                } else if (gamePhase === 'game_over') {
+                    gameOver(msg.winner);
                 }
             }
         }
 
-        // Para host, en status connected, si reconnect, enviar sync si requested
-        // (Añadir listener para sync_request si isHost)
+        function updateActivePlayers() {
+            // Lógica para sync active players si needed
+        }
 
         function exitGame() {
             localStorage.clear();
