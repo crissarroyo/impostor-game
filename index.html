@@ -323,7 +323,7 @@
         </div>
     </div>
 
-    <div class="version">beta 0.8.6.0</div>
+    <div class="version">beta 0.8.6.1</div>
 
     <script>
         const DB = {
@@ -353,6 +353,7 @@
         let hasPublishedRolesToSpectators = false;
         let maxPlayers = 10;
         let currentMaxPlayers = 10;
+        let roomLocked = false;
 
         function initCategories() {
             const list = document.getElementById('categories-list');
@@ -423,12 +424,43 @@
             pubnub.hereNow({
                 channels: [channel]
             }, (s, r) => {
-                if (r && r.totalOccupancy >= currentMaxPlayers) {
-                    alert("Sala llena. Máximo: " + currentMaxPlayers + " jugadores.");
-                    showScreen('home-screen');
-                } else {
+                const currentCount = r ? r.totalOccupancy : 0;
+                
+                // Obtener el estado de bloqueo de la sala
+                pubnub.fetchMessages({
+                    channels: [channel],
+                    count: 100
+                }, (status, response) => {
+                    let locked = false;
+                    let configuredMax = 10;
+                    
+                    if (response && response.channels && response.channels[channel]) {
+                        const messages = response.channels[channel];
+                        for (let i = messages.length - 1; i >= 0; i--) {
+                            if (messages[i].message.type === "config") {
+                                configuredMax = messages[i].message.maxPlayers;
+                            }
+                            if (messages[i].message.type === "room_locked") {
+                                locked = messages[i].message.locked;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (locked) {
+                        alert("Esta sala está bloqueada. No se permiten más jugadores.");
+                        showScreen('home-screen');
+                        return;
+                    }
+                    
+                    if (currentCount >= configuredMax) {
+                        alert("Sala llena. Máximo: " + configuredMax + " jugadores.");
+                        showScreen('home-screen');
+                        return;
+                    }
+                    
                     callback();
-                }
+                });
             });
         }
 
@@ -470,6 +502,12 @@
                         gamePhase = 'round';
                     } else if (msg.type === "vote") {
                         if (isHost || isSpectator) {
+                            // Validar que el voto sea para un jugador activo
+                            if (!activePlayers.includes(msg.target)) {
+                                console.log("Voto inválido: jugador no está activo");
+                                return;
+                            }
+                            
                             votes[msg.target] = (votes[msg.target] || 0) + 1;
                             votedPlayers.add(m.publisher);
                             if (isSpectator) updateSpectatorVoteProgress();
@@ -511,6 +549,12 @@
                     } else if (msg.type === "config") {
                         currentMaxPlayers = msg.maxPlayers;
                         maxPlayers = msg.maxPlayers;
+                    } else if (msg.type === "room_locked") {
+                        roomLocked = msg.locked;
+                        if (roomLocked && !isHost && gamePhase === 'lobby') {
+                            alert("La sala ha sido bloqueada por el host.");
+                            exitGame();
+                        }
                     } else if (msg.type === "host_disconnect") {
                         alert("El host se desconectó. La partida ha terminado.");
                         exitGame();
@@ -519,6 +563,24 @@
                 presence: (p) => {
                     if (p.action === "join" || p.action === "leave" || p.action === "state-change" || p.action === "timeout") {
                         updatePlayersList();
+                        
+                        // Verificar si se alcanzó el límite de jugadores
+                        if (p.action === "join" && isHost && !roomLocked) {
+                            pubnub.hereNow({
+                                channels: [channel]
+                            }, (s, r) => {
+                                if (r && r.totalOccupancy >= currentMaxPlayers) {
+                                    // Bloquear sala cuando se alcanza el máximo
+                                    roomLocked = true;
+                                    pubnub.publish({
+                                        channel: channel,
+                                        message: { type: "room_locked", locked: true }
+                                    });
+                                    console.log("Sala bloqueada. Máximo de jugadores alcanzado.");
+                                }
+                            });
+                        }
+                        
                         if (p.action === "leave" || p.action === "timeout") {
                             const leavingPlayer = p.uuid;
                             if (isHost && leavingPlayer !== myId) {
@@ -567,10 +629,28 @@
             pubnub.hereNow({
                 channels: [channel]
             }, (s, r) => {
-                if (r && r.totalOccupancy > currentMaxPlayers) {
-                    // Expulsar jugadores excedentes
-                    const excess = r.totalOccupancy - currentMaxPlayers;
-                    console.log("Sala excede capacidad. Expulsando " + excess + " jugadores.");
+                if (r) {
+                    const currentCount = r.totalOccupancy;
+                    
+                    // Bloquear sala si se alcanza el máximo
+                    if (currentCount >= currentMaxPlayers && !roomLocked) {
+                        roomLocked = true;
+                        pubnub.publish({
+                            channel: channel,
+                            message: { type: "room_locked", locked: true }
+                        });
+                        console.log("Sala bloqueada automáticamente. Límite alcanzado.");
+                    }
+                    
+                    // Desbloquear si hay espacio disponible
+                    if (currentCount < currentMaxPlayers && roomLocked && gamePhase === 'lobby') {
+                        roomLocked = false;
+                        pubnub.publish({
+                            channel: channel,
+                            message: { type: "room_locked", locked: false }
+                        });
+                        console.log("Sala desbloqueada. Hay espacio disponible.");
+                    }
                 }
             });
         }
@@ -726,10 +806,14 @@
 
             const voteList = document.getElementById('vote-list');
             voteList.innerHTML = '';
+            
+            // Solo mostrar jugadores activos que NO han sido eliminados
             activePlayers.forEach(id => {
+                // No votar por ti mismo y no mostrar eliminados
                 if (id === myId) return;
+                
                 const li = document.createElement('li');
-                li.innerText = playersMap[id];
+                li.innerText = playersMap[id] || id;
                 const btn = document.createElement('button');
                 btn.classList.add('vote-btn');
                 btn.innerText = 'Votar 🗳️';
@@ -761,6 +845,18 @@
         }
 
         function sendVote(target, btn) {
+            // Verificar que el objetivo no esté eliminado
+            if (eliminated.includes(target)) {
+                alert("No puedes votar por un jugador eliminado.");
+                return;
+            }
+            
+            // Verificar que el objetivo esté en activePlayers
+            if (!activePlayers.includes(target)) {
+                alert("Este jugador ya no está activo.");
+                return;
+            }
+            
             pubnub.publish({
                 channel: channel,
                 message: { type: "vote", target: target }
