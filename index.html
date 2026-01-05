@@ -123,6 +123,7 @@
             <h2>Modo Espectador 👀</h2>
             <p>Has sido expulsado, pero puedes seguir viendo el juego.</p>
             <div id="spectator-status"></div>
+            <ul id="spectator-roles" class="player-list"></ul>
             <ul id="spectator-vote-progress" class="player-list"></ul>
             <button class="btn-main" onclick="exitGame()" style="background:#475569">SALIR 🚪</button>
         </div>
@@ -137,19 +138,22 @@
         <div id="instructions-screen" class="screen">
             <h2>Instrucciones del Juego 📜</h2>
             <div class="setup-box">
-                <p>1. Crea o únete a una sala.</p>
-                <p>2. El host configura y reparte roles: Ciudadanos saben la palabra secreta, Impostores saben la categoría, Charlatanes tienen una palabra falsa.</p>
-                <p>3. En cada ronda, da pistas relacionadas con la palabra (sin decirla).</p>
-                <p>4. Al final de la ronda, vota por el sospechoso de ser impostor.</p>
-                <p>5. El más votado es expulsado. Si es impostor, ciudadanos ganan. Si no, continúa hasta encontrar todos los impostores.</p>
-                <p>6. Espectadores ven el progreso sin participar.</p>
+                <p>🕵️‍♂️ Bienvenido a El Impostor, un juego de deducción social multijugador.</p>
+                <p>1. Crea o únete a una sala usando el código o QR. 👥</p>
+                <p>2. El host configura número de impostores, charlatanes, tiempo y categorías. ⚙️</p>
+                <p>3. Roles: Ciudadanos 😇 conocen la palabra secreta, Impostores 😈 saben la categoría, Charlatanes 🤡 tienen una palabra similar pero falsa.</p>
+                <p>4. En rondas ⏱, da pistas relacionadas sin revelar la palabra. Discute con otros para identificar impostores.</p>
+                <p>5. Al final de cada ronda, vota 🗳️ por el sospechoso. Solo un voto por jugador.</p>
+                <p>6. El más votado es expulsado 🚫. Si es impostor, ¡punto para ciudadanos! Continúa hasta eliminar todos los impostores.</p>
+                <p>7. Si eres expulsado injustamente, entra en modo espectador 👀 para ver el progreso, roles y votos en tiempo real.</p>
+                <p>¡Diviértete y sé astuto! 🎉</p>
             </div>
             <button class="btn-main" onclick="showScreen('home-screen')">VOLVER</button>
         </div>
     </div>
 
     <!-- Versión Beta -->
-    <div class="version">beta 0.8.4.6</div>
+    <div class="version">beta 0.8.4.7</div>
 
     <script>
         const DB = {
@@ -170,11 +174,13 @@
             "Planetas 🪐": ["Mercurio", "Venus", "Tierra", "Marte", "Júpiter", "Saturno", "Urano", "Neptuno", "Plutón", "Ceres", "Eris", "Makemake", "Haumea", "Europa", "Ganimedes", "Calisto", "Io", "Titán", "Encélado", "Tritón", "Luna", "Fobos", "Deimos", "Caronte", "Oberon", "Titania", "Ariel", "Miranda"]
         };
 
-        let pubnub, channel, isHost = false, myId = localStorage.getItem('myId') || "P-" + Math.floor(Math.random() * 999999), playerName = localStorage.getItem('playerName') || "";
+        let pubnub, channel, isHost = false, myId = "P-" + Math.floor(Math.random() * 999999), playerName = "";
         let players = [], playersMap = {}, activePlayers = [], refreshInterval, myRole = {}, votes = {}, votedPlayers = new Set(), timerInterval, voteTimerInterval;
         let gamePhase = 'lobby'; // lobby, roles, round, voting, results, game_over
         let impostors = [], charlatans = [], citizens = [], eliminated = [], roundTime = 60, isSpectator = false;
         let selectedCategories = Object.keys(DB);
+        let fullRoles = {};
+        let hasPublishedRolesToSpectators = false;
 
         function initCategories() {
             const list = document.getElementById('categories-list');
@@ -264,7 +270,15 @@
                             votes[msg.target] = (votes[msg.target] || 0) + 1;
                             votedPlayers.add(m.publisher);
                             if (isSpectator) updateSpectatorVoteProgress();
-                            if (isHost && votedPlayers.size === activePlayers.length) publishResults();
+                            if (isHost) {
+                                pubnub.publish({ channel: channel, message: { type: "vote_update", votes: votes } });
+                                if (votedPlayers.size === activePlayers.length) publishResults();
+                            }
+                        }
+                    } else if (msg.type === "vote_update") {
+                        if (isSpectator) {
+                            votes = msg.votes;
+                            updateSpectatorVoteProgress();
                         }
                     } else if (msg.type === "results") {
                         showResults(msg.votes, msg.mostVoted, msg.eliminated);
@@ -279,6 +293,11 @@
                     } else if (msg.type === "phase_update") {
                         if (isSpectator) {
                             document.getElementById('spectator-status').innerText = msg.status;
+                        }
+                    } else if (msg.type === "spectator_roles") {
+                        if (isSpectator) {
+                            fullRoles = msg.roles;
+                            updateSpectatorRoles();
                         }
                     }
                 },
@@ -385,6 +404,7 @@
             });
 
             activePlayers = [...players];
+            fullRoles = roles;
             pubnub.publish({ channel: channel, message: { type: "assign", roles: roles } });
         }
 
@@ -475,6 +495,9 @@
             btn.innerText = 'Votado ✅';
             btn.disabled = true;
             console.log("Voto enviado a", target);
+            // Ocultar botones después de votar
+            document.querySelectorAll('.vote-btn').forEach(b => b.disabled = true);
+            document.getElementById('vote-status').innerText = "Voto registrado. Espera resultados... ⏱";
         }
 
         function publishResults() {
@@ -495,6 +518,10 @@
             charlatans = charlatans.filter(id => id !== eliminatedId);
             citizens = citizens.filter(id => id !== eliminatedId);
             pubnub.publish({ channel: channel, message: { type: "results", votes: votes, mostVoted: playersMap[eliminatedId], eliminated: eliminatedId, isImpostor: isImpostor } });
+            if (!hasPublishedRolesToSpectators && eliminated.length > 0) {
+                pubnub.publish({ channel: channel, message: { type: "spectator_roles", roles: fullRoles } });
+                hasPublishedRolesToSpectators = true;
+            }
             checkGameOver();
         }
 
@@ -600,8 +627,19 @@
             progressList.innerHTML = '';
             activePlayers.forEach(id => {
                 const li = document.createElement('li');
-                li.innerText = `${playersMap[id]}: ${votedPlayers.has(id) ? 'Votó ✅' : 'Pendiente ⏳'}`;
+                li.innerText = `${playersMap[id]}: Votos - ${votes[id] || 0} ${votedPlayers.has(id) ? ' (Ha votado ✅)' : ' (Pendiente ⏳)'}`;
                 progressList.appendChild(li);
+            });
+        }
+
+        function updateSpectatorRoles() {
+            const rolesList = document.getElementById('spectator-roles');
+            rolesList.innerHTML = '';
+            Object.keys(fullRoles).forEach(id => {
+                const roleData = fullRoles[id];
+                const li = document.createElement('li');
+                li.innerText = `${playersMap[id]}: ${roleData.role} ${roleData.icon} - Palabra: ${roleData.word}`;
+                rolesList.appendChild(li);
             });
         }
 
