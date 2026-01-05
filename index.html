@@ -215,9 +215,20 @@
                             <input type="number" id="num-char" value="0" min="0" class="input-dark input-number"></label><br><br>
                         <label>⏱ Tiempo por Ronda:
                             <select id="round-time" class="input-dark" style="width: 100px;">
+                                <option value="10">10 seg</option>
+                                <option value="20">20 seg</option>
                                 <option value="30">30 seg</option>
+                                <option value="40">40 seg</option>
+                                <option value="50">50 seg</option>
                                 <option value="60">1 min</option>
+                                <option value="70">1:10</option>
+                                <option value="80">1:20</option>
+                                <option value="90">1:30</option>
+                                <option value="100">1:40</option>
+                                <option value="110">1:50</option>
                                 <option value="120">2 min</option>
+                                <option value="150">2:30</option>
+                                <option value="180">3 min</option>
                             </select>
                         </label><br><br>
                         <label>Categorías:
@@ -312,7 +323,7 @@
         </div>
     </div>
 
-    <div class="version">beta 0.8.5.0</div>
+    <div class="version">beta 0.8.6.0</div>
 
     <script>
         const DB = {
@@ -341,6 +352,7 @@
         let fullRoles = {};
         let hasPublishedRolesToSpectators = false;
         let maxPlayers = 10;
+        let currentMaxPlayers = 10;
 
         function initCategories() {
             const list = document.getElementById('categories-list');
@@ -382,7 +394,8 @@
             if (mode === 'host') {
                 isHost = true;
                 code = Math.random().toString(36).substr(2, 4).toUpperCase();
-                maxPlayers = parseInt(document.getElementById('max-players').value) || 10;
+                currentMaxPlayers = parseInt(document.getElementById('max-players').value) || 10;
+                maxPlayers = currentMaxPlayers;
             } else if (mode !== 'reconnect') {
                 code = document.getElementById('join-input').value.toUpperCase();
                 if (code.length !== 4) return alert("Código inválido.");
@@ -410,8 +423,8 @@
             pubnub.hereNow({
                 channels: [channel]
             }, (s, r) => {
-                if (r && r.totalOccupancy >= maxPlayers) {
-                    alert("Sala llena. Máximo: " + maxPlayers + ".");
+                if (r && r.totalOccupancy >= currentMaxPlayers) {
+                    alert("Sala llena. Máximo: " + currentMaxPlayers + " jugadores.");
                     showScreen('home-screen');
                 } else {
                     callback();
@@ -429,9 +442,15 @@
                     if (s.category === "PNConnectedCategory") {
                         console.log("Conectado a PubNub.");
                         setPlayerState();
-                        updatePlayersList();
+                        setTimeout(() => {
+                            updatePlayersList();
+                            checkRoomCapacity();
+                        }, 500);
                         document.getElementById('spinner').style.display = 'none';
-                        refreshInterval = setInterval(updatePlayersList, 5000);
+                        refreshInterval = setInterval(() => {
+                            updatePlayersList();
+                            checkRoomCapacity();
+                        }, 5000);
                         if (isHost) document.getElementById('host-distribute').style.display = 'block';
                     } else if (s.category === "PNNetworkDownCategory") {
                         alert("Conexión perdida. Reintentando...");
@@ -490,6 +509,7 @@
                             updateSpectatorRoles();
                         }
                     } else if (msg.type === "config") {
+                        currentMaxPlayers = msg.maxPlayers;
                         maxPlayers = msg.maxPlayers;
                     } else if (msg.type === "host_disconnect") {
                         alert("El host se desconectó. La partida ha terminado.");
@@ -530,7 +550,7 @@
             if (isHost) {
                 pubnub.publish({
                     channel: channel,
-                    message: { type: "config", maxPlayers: maxPlayers }
+                    message: { type: "config", maxPlayers: currentMaxPlayers }
                 });
 
                 const qr = qrcode(0, 'M');
@@ -539,6 +559,20 @@
                 qr.make();
                 document.getElementById('qrcode').innerHTML = qr.createImgTag(5);
             }
+        }
+
+        function checkRoomCapacity() {
+            if (!isHost) return;
+            
+            pubnub.hereNow({
+                channels: [channel]
+            }, (s, r) => {
+                if (r && r.totalOccupancy > currentMaxPlayers) {
+                    // Expulsar jugadores excedentes
+                    const excess = r.totalOccupancy - currentMaxPlayers;
+                    console.log("Sala excede capacidad. Expulsando " + excess + " jugadores.");
+                }
+            });
         }
 
         function setPlayerState() {
@@ -693,7 +727,7 @@
             const voteList = document.getElementById('vote-list');
             voteList.innerHTML = '';
             activePlayers.forEach(id => {
-                if (id === myId || eliminated.includes(id)) return;
+                if (id === myId) return;
                 const li = document.createElement('li');
                 li.innerText = playersMap[id];
                 const btn = document.createElement('button');
@@ -751,7 +785,23 @@
                 }
             });
 
-            const eliminatedId = mostVoted[Math.floor(Math.random() * mostVoted.length)];
+            // Si hay empate o nadie votó, ir a siguiente ronda sin eliminar
+            if (mostVoted.length > 1 || maxVotes === 0) {
+                pubnub.publish({
+                    channel: channel,
+                    message: {
+                        type: "results",
+                        votes: votes,
+                        mostVoted: "EMPATE",
+                        eliminated: null,
+                        eliminatedRole: "EMPATE",
+                        isTie: true
+                    }
+                });
+                return;
+            }
+
+            const eliminatedId = mostVoted[0];
             eliminated.push(eliminatedId);
             activePlayers = activePlayers.filter(id => id !== eliminatedId);
 
@@ -776,7 +826,8 @@
                     votes: votes,
                     mostVoted: playersMap[eliminatedId],
                     eliminated: eliminatedId,
-                    eliminatedRole: eliminatedRole
+                    eliminatedRole: eliminatedRole,
+                    isTie: false
                 }
             });
 
@@ -793,7 +844,11 @@
 
         function showResults(votesData, mostVoted, eliminatedId, eliminatedRole) {
             if (isSpectator) {
-                document.getElementById('spectator-status').innerText = `Resultados: ${mostVoted} fue expulsado (${eliminatedRole})`;
+                if (eliminatedRole === "EMPATE") {
+                    document.getElementById('spectator-status').innerText = `⚖️ EMPATE en la votación. Nueva ronda sin eliminaciones.`;
+                } else {
+                    document.getElementById('spectator-status').innerText = `Resultados: ${mostVoted} fue expulsado (${eliminatedRole})`;
+                }
                 return;
             }
 
@@ -802,28 +857,36 @@
 
             const resultsList = document.getElementById('results-list');
             resultsList.innerHTML = '';
-            const maxVotes = Math.max(...Object.values(votesData), 1);
+            
+            if (Object.keys(votesData).length === 0) {
+                resultsList.innerHTML = '<li>No hubo votos. ⏰</li>';
+            } else {
+                const maxVotes = Math.max(...Object.values(votesData), 1);
+                Object.keys(votesData).forEach(id => {
+                    const li = document.createElement('li');
+                    li.innerText = `${playersMap[id]}: ${votesData[id]} votos 🗳️`;
+                    const bar = document.createElement('div');
+                    bar.classList.add('results-bar');
+                    const fill = document.createElement('div');
+                    fill.classList.add('results-fill');
+                    fill.style.width = `${(votesData[id] / maxVotes) * 100}%`;
+                    bar.appendChild(fill);
+                    li.appendChild(bar);
+                    resultsList.appendChild(li);
+                });
+            }
 
-            Object.keys(votesData).forEach(id => {
-                const li = document.createElement('li');
-                li.innerText = `${playersMap[id]}: ${votesData[id]} votos 🗳️`;
-                const bar = document.createElement('div');
-                bar.classList.add('results-bar');
-                const fill = document.createElement('div');
-                fill.classList.add('results-fill');
-                fill.style.width = `${(votesData[id] / maxVotes) * 100}%`;
-                bar.appendChild(fill);
-                li.appendChild(bar);
-                resultsList.appendChild(li);
-            });
+            if (eliminatedRole === "EMPATE") {
+                document.getElementById('most-voted').innerHTML = `⚖️ <strong>EMPATE</strong> en la votación.<br>Nueva ronda sin eliminaciones.`;
+            } else {
+                const roleIcon = eliminatedRole === "IMPOSTOR" ? "😈" : (eliminatedRole === "CHARLATÁN" ? "🤡" : "😇");
+                document.getElementById('most-voted').innerText = `Expulsado: ${mostVoted} ${roleIcon} (${eliminatedRole})`;
 
-            const roleIcon = eliminatedRole === "IMPOSTOR" ? "😈" : (eliminatedRole === "CHARLATÁN" ? "🤡" : "😇");
-            document.getElementById('most-voted').innerText = `Expulsado: ${mostVoted} ${roleIcon} (${eliminatedRole})`;
-
-            if (myId === eliminatedId) {
-                isSpectator = true;
-                showScreen('spectator-screen');
-                document.getElementById('spectator-status').innerText = `Has sido expulsado ${roleIcon} (${eliminatedRole}). Observa el juego.`;
+                if (myId === eliminatedId) {
+                    isSpectator = true;
+                    showScreen('spectator-screen');
+                    document.getElementById('spectator-status').innerText = `Has sido expulsado ${roleIcon} (${eliminatedRole}). Observa el juego.`;
+                }
             }
 
             if (isHost && impostors.length > 0 && activePlayers.length > 2) {
