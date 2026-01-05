@@ -26,6 +26,9 @@
         ul.player-list li { margin: 5px 0; }
         /* Versión Beta */
         .version { position: fixed; bottom: 10px; right: 10px; color: var(--text); opacity: 0.5; font-size: 0.8rem; z-index: 1000; }
+        /* Voting */
+        .vote-btn { background: #3b82f6; color: white; border: none; padding: 8px; border-radius: 8px; margin-left: 10px; cursor: pointer; }
+        .voted { background: #22c55e; }
     </style>
 </head>
 <body>
@@ -65,25 +68,46 @@
                         </select>
                     </label>
                 </div>
-                <button class="btn-main" onclick="distributeRoles()">¡REPARTIR Y EMPEZAR! 📦</button>
+                <button class="btn-main" onclick="distributeRoles()">¡REPARTIR ROLES! 📦</button>
             </div>
         </div>
 
         <div id="role-screen" class="screen">
-            <h3>Toca para ver:</h3>
+            <h3>Toca para ver tu rol:</h3>
             <div class="card" id="my-card" onclick="this.style.filter='none'">
                 <div id="my-icon" style="font-size:80px">❓</div>
                 <h2 id="my-role">SECRET</h2>
                 <div id="my-word" class="word"></div>
             </div>
-            <p>Espera a que el host inicie el tiempo.</p>
+            <p id="wait-host">Espera a que el host inicie el tiempo.</p>
+            <div id="host-start-timer" style="display:none"><button class="btn-main" onclick="startTimer()">¡INICIAR TIMER! ⏱</button></div>
             <div id="timer-display" class="timer" style="display:none">00:00</div>
-            <button class="btn-main" onclick="location.reload()" style="background:#475569">SALIR</button>
+            <button class="btn-main" onclick="exitGame()" style="background:#475569">SALIR</button>
+        </div>
+
+        <div id="voting-screen" class="screen">
+            <h2>¡Vota por el Impostor!</h2>
+            <div class="setup-box">
+                <ul id="vote-list" class="player-list"></ul>
+                <p id="vote-status">Espera a que todos voten...</p>
+            </div>
+            <button class="btn-main" onclick="exitGame()" style="background:#475569">SALIR</button>
+            <div id="host-results" style="display:none"><button class="btn-main" onclick="publishResults()">MOSTRAR RESULTADOS</button></div>
+        </div>
+
+        <div id="results-screen" class="screen">
+            <h2>Resultados de Votos</h2>
+            <div class="setup-box">
+                <ul id="results-list" class="player-list"></ul>
+                <p id="most-voted"></p>
+            </div>
+            <button class="btn-main" onclick="exitGame()">SALIR</button>
+            <div id="host-restart" style="display:none"><button class="btn-main" style="background:#22c55e" onclick="restartGame()">REINICIAR SALA</button></div>
         </div>
     </div>
 
     <!-- Versión Beta -->
-    <div class="version">beta 0.8.4.1</div>
+    <div class="version">beta 0.8.4.2</div>
 
     <script>
         const DB = {
@@ -92,30 +116,47 @@
             "Países 🌎": ["México", "Japón", "Brasil", "España", "Francia", "Italia", "Canadá", "Egipto"]
         };
 
-        let pubnub, channel, isHost = false, myId = "P-" + Math.floor(Math.random() * 999999), playerName = "";
-        let players = [], playersMap = {}, refreshInterval;
+        let pubnub, channel, isHost = false, myId = localStorage.getItem('myId') || "P-" + Math.floor(Math.random() * 999999), playerName = localStorage.getItem('playerName') || "";
+        let players = [], playersMap = {}, refreshInterval, myRole = {}, votes = {}, votedPlayers = new Set(), timerInterval;
+        let gamePhase = 'lobby'; // lobby, roles, timer, voting, results
+
+        // Chequear reconexión al load
+        window.addEventListener('load', () => {
+            const storedChannel = localStorage.getItem('channel');
+            if (storedChannel && playerName) {
+                if (confirm(`Reconectar a sala ${storedChannel}?`)) {
+                    channel = storedChannel;
+                    startSession('reconnect');
+                }
+            }
+        });
 
         function startSession(mode) {
-            playerName = document.getElementById('player-name').value.trim();
-            if (!playerName) return alert("Ingresa tu nombre");
+            if (mode !== 'reconnect') {
+                playerName = document.getElementById('player-name').value.trim();
+                if (!playerName) return alert("Ingresa tu nombre");
+                localStorage.setItem('playerName', playerName);
+                localStorage.setItem('myId', myId);
+            }
 
-            let code = "";
+            let code = channel || "";
             if (mode === 'host') {
                 isHost = true;
                 code = Math.random().toString(36).substr(2, 4).toUpperCase();
-            } else {
+            } else if (mode !== 'reconnect') {
                 code = document.getElementById('join-input').value.toUpperCase();
                 if (code.length !== 4) return alert("Código inválido");
             }
-
             channel = code;
+            localStorage.setItem('channel', channel);
+
             document.getElementById('display-code').innerText = channel;
             showScreen('lobby-screen');
-            document.getElementById('spinner').style.display = 'block';  // Mostrar spinner
+            document.getElementById('spinner').style.display = 'block';
 
             pubnub = new PubNub({
-                publishKey: 'demo',  // Clave demo para testing
-                subscribeKey: 'demo',  // Clave demo para testing
+                publishKey: 'demo',
+                subscribeKey: 'demo',
                 userId: myId
             });
 
@@ -125,12 +166,11 @@
                         console.log("Conectado a PubNub!");
                         setPlayerState();
                         checkRoomSize();
-                        updatePlayersList();  // Update inicial
-                        document.getElementById('spinner').style.display = 'none';  // Ocultar spinner
-                        // Interval para refresh en lobby (cada 5s)
+                        updatePlayersList();
+                        document.getElementById('spinner').style.display = 'none';
                         refreshInterval = setInterval(updatePlayersList, 5000);
+                        if (mode === 'reconnect') syncGameState();
                     } else if (s.category === "PNNetworkDownCategory") {
-                        console.error("Red caída, reconectando...");
                         alert("Conexión perdida. Reintentando...");
                         pubnub.reconnect();
                     } else if (s.error) {
@@ -144,14 +184,32 @@
                     if (msg.type === "assign") {
                         const data = msg.roles[myId];
                         if (data) {
+                            myRole = data;
+                            localStorage.setItem('myRole', JSON.stringify(myRole));
                             document.getElementById('my-icon').innerText = data.icon;
                             document.getElementById('my-role').innerText = data.role;
                             document.getElementById('my-word').innerText = data.word;
                             showScreen('role-screen');
-                            clearInterval(refreshInterval);  // Parar refresh al empezar juego
+                            gamePhase = 'roles';
+                            if (isHost) document.getElementById('host-start-timer').style.display = 'block';
+                            else document.getElementById('wait-host').style.display = 'block';
                         }
+                    } else if (msg.type === "start_timer") {
+                        startLocalTimer(msg.time);
+                        gamePhase = 'timer';
+                    } else if (msg.type === "vote") {
+                        if (isHost) {
+                            votes[msg.target] = (votes[msg.target] || 0) + 1;
+                            votedPlayers.add(m.publisher);
+                            if (votedPlayers.size === players.length) publishResults();
+                        }
+                    } else if (msg.type === "results") {
+                        showResults(msg.votes, msg.mostVoted);
+                    } else if (msg.type === "restart") {
+                        location.reload();
+                    } else if (msg.type === "sync") {
+                        handleSync(msg);
                     }
-                    if (msg.type === "start_timer") startLocalTimer(msg.time);
                 },
                 presence: (p) => {
                     if (p.action === "join" || p.action === "leave" || p.action === "state-change" || p.action === "timeout") {
@@ -162,7 +220,7 @@
 
             pubnub.subscribe({ channels: [channel], withPresence: true });
 
-            if (isHost) {
+            if (isHost && mode !== 'reconnect') {
                 document.getElementById('host-controls').style.display = 'block';
                 const qr = qrcode(0, 'M');
                 const baseUrl = window.location.origin + window.location.pathname;
@@ -220,9 +278,9 @@
         }
 
         function distributeRoles() {
+            if (players.length < 3) alert("Para testing ok, pero ideal ≥3 jugadores");
             const nImp = parseInt(document.getElementById('num-imp').value);
             const nChar = parseInt(document.getElementById('num-char').value);
-            const maxPlayers = parseInt(document.getElementById('max-players').value);
             const time = parseInt(document.getElementById('round-time').value);
 
             if (nImp + nChar > players.length) return alert("Impostores + Charlatanes no pueden exceder jugadores (" + players.length + ")");
@@ -236,53 +294,150 @@
             let roles = {};
             let pool = [...players];
 
-            // Asignar Impostores
             for(let i=0; i<nImp && pool.length; i++) {
                 let id = pool.splice(Math.floor(Math.random()*pool.length), 1)[0];
                 roles[id] = { role: "IMPOSTOR", icon: "😈", word: "Cat: " + cat };
             }
-            // Asignar Charlatanes
             for(let i=0; i<nChar && pool.length; i++) {
                 let id = pool.splice(Math.floor(Math.random()*pool.length), 1)[0];
                 roles[id] = { role: "CHARLATÁN", icon: "🤡", word: fake };
             }
-            // Ciudadanos
             pool.forEach(id => {
                 roles[id] = { role: "CIUDADANO", icon: "😇", word: secret };
             });
 
             pubnub.publish({ channel: channel, message: { type: "assign", roles: roles } });
-            setTimeout(() => {
-                pubnub.publish({ channel: channel, message: { type: "start_timer", time: time } });
-            }, 2000);
+        }
+
+        function startTimer() {
+            const time = parseInt(document.getElementById('round-time').value);
+            pubnub.publish({ channel: channel, message: { type: "start_timer", time: time } });
+            document.getElementById('host-start-timer').style.display = 'none';
         }
 
         function startLocalTimer(duration) {
-            const display = document.getElementById('timer-display');
-            display.style.display = "block";
+            document.getElementById('timer-display').style.display = "block";
+            document.getElementById('wait-host').style.display = "none";
             let timer = duration;
-            const interval = setInterval(() => {
+            timerInterval = setInterval(() => {
                 let mins = Math.floor(timer / 60);
                 let secs = timer % 60;
-                display.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+                document.getElementById('timer-display').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
                 if (--timer < 0) {
-                    clearInterval(interval);
-                    display.innerText = "¡TIEMPO!";
+                    clearInterval(timerInterval);
+                    document.getElementById('timer-display').innerText = "¡TIEMPO!";
                     if(navigator.vibrate) navigator.vibrate([500, 200, 500]);
+                    startVoting();
                 }
             }, 1000);
+        }
+
+        function startVoting() {
+            showScreen('voting-screen');
+            gamePhase = 'voting';
+            votes = {};
+            votedPlayers = new Set();
+            const voteList = document.getElementById('vote-list');
+            voteList.innerHTML = '';
+            players.forEach(id => {
+                if (id === myId) return;
+                const li = document.createElement('li');
+                li.innerText = playersMap[id];
+                const btn = document.createElement('button');
+                btn.classList.add('vote-btn');
+                btn.innerText = 'Votar';
+                btn.onclick = () => sendVote(id, btn);
+                li.appendChild(btn);
+                voteList.appendChild(li);
+            });
+            if (isHost) document.getElementById('host-results').style.display = 'block';
+            setTimeout(() => { if (isHost && votedPlayers.size < players.length) publishResults(); }, 30000);
+        }
+
+        function sendVote(target, btn) {
+            pubnub.publish({ channel: channel, message: { type: "vote", target: target } });
+            btn.classList.add('voted');
+            btn.innerText = 'Votado';
+            btn.disabled = true;
+            console.log("Voto enviado a", target);
+        }
+
+        function publishResults() {
+            let maxVotes = 0, mostVoted = [];
+            Object.keys(votes).forEach(id => {
+                if (votes[id] > maxVotes) {
+                    maxVotes = votes[id];
+                    mostVoted = [id];
+                } else if (votes[id] === maxVotes) {
+                    mostVoted.push(id);
+                }
+            });
+            pubnub.publish({ channel: channel, message: { type: "results", votes: votes, mostVoted: mostVoted.map(id => playersMap[id]).join(', ') } });
+        }
+
+        function showResults(votesData, mostVoted) {
+            showScreen('results-screen');
+            gamePhase = 'results';
+            const resultsList = document.getElementById('results-list');
+            resultsList.innerHTML = '';
+            Object.keys(votesData).forEach(id => {
+                const li = document.createElement('li');
+                li.innerText = `${playersMap[id]}: ${votesData[id]} votos`;
+                resultsList.appendChild(li);
+            });
+            document.getElementById('most-voted').innerText = `Más votado: ${mostVoted}`;
+            if (isHost) document.getElementById('host-restart').style.display = 'block';
+        }
+
+        function restartGame() {
+            pubnub.publish({ channel: channel, message: { type: "restart" } });
+            location.reload();
+        }
+
+        function syncGameState() {
+            pubnub.publish({ channel: channel, message: { type: "sync_request" } });
+        }
+
+        function handleSync(msg) {
+            if (msg.type === "sync") {
+                gamePhase = msg.phase;
+                if (gamePhase === 'roles' || gamePhase === 'timer') {
+                    myRole = JSON.parse(localStorage.getItem('myRole')) || {};
+                    if (myRole.role) {
+                        document.getElementById('my-icon').innerText = myRole.icon;
+                        document.getElementById('my-role').innerText = myRole.role;
+                        document.getElementById('my-word').innerText = myRole.word;
+                        showScreen('role-screen');
+                        if (gamePhase === 'timer') startLocalTimer(msg.remainingTime);
+                        if (isHost && gamePhase === 'roles') document.getElementById('host-start-timer').style.display = 'block';
+                    }
+                } else if (gamePhase === 'voting') {
+                    startVoting();
+                } else if (gamePhase === 'results') {
+                    showResults(msg.votes, msg.mostVoted);
+                }
+            }
+        }
+
+        // Para host, en status connected, si reconnect, enviar sync si requested
+        // (Añadir listener para sync_request si isHost)
+
+        function exitGame() {
+            localStorage.clear();
+            location.reload();
         }
 
         function showScreen(id) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(id).classList.add('active');
+            clearInterval(refreshInterval);
         }
 
-        // Soporte para entrar directo por link
+        // Soporte para link
         const params = new URLSearchParams(window.location.search);
         if (params.has('room')) {
             document.getElementById('join-input').value = params.get('room');
-            if (!document.getElementById('player-name').value) {
+            if (!playerName) {
                 const name = prompt("Ingresa tu nombre:");
                 if (name) document.getElementById('player-name').value = name;
             }
