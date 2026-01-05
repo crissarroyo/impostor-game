@@ -78,8 +78,9 @@
             font-size: var(--font-size-base);
         }
         .input-number {
-            width: 60px;
-            padding-right: 30px;
+            width: 80px;
+            text-align: left;
+            padding-left: 10px;
         }
         .card {
             width: 260px;
@@ -323,7 +324,7 @@
         </div>
     </div>
 
-    <div class="version">beta 0.8.6.1</div>
+    <div class="version">beta 0.8.6.2</div>
 
     <script>
         const DB = {
@@ -551,21 +552,20 @@
                         maxPlayers = msg.maxPlayers;
                     } else if (msg.type === "room_locked") {
                         roomLocked = msg.locked;
-                        if (roomLocked && !isHost && gamePhase === 'lobby') {
-                            alert("La sala ha sido bloqueada por el host.");
-                            exitGame();
-                        }
+                        // Solo expulsar a jugadores que intenten entrar DESPUÉS del bloqueo
+                        // Los que ya están dentro no son afectados
                     } else if (msg.type === "host_disconnect") {
                         alert("El host se desconectó. La partida ha terminado.");
                         exitGame();
                     }
                 },
                 presence: (p) => {
-                    if (p.action === "join" || p.action === "leave" || p.action === "state-change" || p.action === "timeout") {
-                        updatePlayersList();
-                        
-                        // Verificar si se alcanzó el límite de jugadores
-                        if (p.action === "join" && isHost && !roomLocked) {
+                    // Actualizar lista en cada cambio de presencia
+                    updatePlayersList();
+                    
+                    if (p.action === "join" && isHost && !roomLocked) {
+                        // Verificar si se alcanzó el límite SOLO para nuevos joins
+                        setTimeout(() => {
                             pubnub.hereNow({
                                 channels: [channel]
                             }, (s, r) => {
@@ -579,26 +579,35 @@
                                     console.log("Sala bloqueada. Máximo de jugadores alcanzado.");
                                 }
                             });
-                        }
+                        }, 500);
+                    }
+                    
+                    if (p.action === "leave" || p.action === "timeout") {
+                        const leavingPlayer = p.uuid;
                         
-                        if (p.action === "leave" || p.action === "timeout") {
-                            const leavingPlayer = p.uuid;
-                            if (isHost && leavingPlayer !== myId) {
-                                // Si un jugador activo se desconecta durante el juego
-                                if (gamePhase !== 'lobby' && activePlayers.includes(leavingPlayer)) {
-                                    activePlayers = activePlayers.filter(id => id !== leavingPlayer);
+                        // Si un jugador se desconecta, actualizar listas
+                        if (leavingPlayer !== myId) {
+                            // Actualizar en tiempo real
+                            players = players.filter(id => id !== leavingPlayer);
+                            delete playersMap[leavingPlayer];
+                            
+                            // Si estamos en juego, manejar desconexión
+                            if (gamePhase !== 'lobby' && activePlayers.includes(leavingPlayer)) {
+                                activePlayers = activePlayers.filter(id => id !== leavingPlayer);
+                                if (!eliminated.includes(leavingPlayer)) {
                                     eliminated.push(leavingPlayer);
                                 }
                             }
-                            // Si el host se desconecta
-                            if (!isHost && players.length > 0 && players[0] === leavingPlayer) {
-                                pubnub.publish({
-                                    channel: channel,
-                                    message: { type: "host_disconnect" }
-                                });
-                                alert("El host se desconectó. La partida ha terminado.");
-                                exitGame();
-                            }
+                        }
+                        
+                        // Si el host se desconecta, terminar juego
+                        if (!isHost && players.length > 0 && p.uuid === players[0]) {
+                            pubnub.publish({
+                                channel: channel,
+                                message: { type: "host_disconnect" }
+                            });
+                            alert("El host se desconectó. La partida ha terminado.");
+                            exitGame();
                         }
                     }
                 }
@@ -632,7 +641,7 @@
                 if (r) {
                     const currentCount = r.totalOccupancy;
                     
-                    // Bloquear sala si se alcanza el máximo
+                    // Bloquear sala si se alcanza el máximo (solo para nuevos)
                     if (currentCount >= currentMaxPlayers && !roomLocked) {
                         roomLocked = true;
                         pubnub.publish({
@@ -642,15 +651,8 @@
                         console.log("Sala bloqueada automáticamente. Límite alcanzado.");
                     }
                     
-                    // Desbloquear si hay espacio disponible
-                    if (currentCount < currentMaxPlayers && roomLocked && gamePhase === 'lobby') {
-                        roomLocked = false;
-                        pubnub.publish({
-                            channel: channel,
-                            message: { type: "room_locked", locked: false }
-                        });
-                        console.log("Sala desbloqueada. Hay espacio disponible.");
-                    }
+                    // NO desbloquear automáticamente si alguien sale
+                    // La sala permanece bloqueada hasta que el host decida
                 }
             });
         }
@@ -668,22 +670,41 @@
                 includeState: true
             }, (s, r) => {
                 if (r && r.channels && r.channels[channel]) {
-                    players = r.channels[channel].occupants.map(o => o.uuid);
-                    playersMap = r.channels[channel].occupants.reduce((map, o) => {
+                    const newPlayers = r.channels[channel].occupants.map(o => o.uuid);
+                    const newPlayersMap = r.channels[channel].occupants.reduce((map, o) => {
                         map[o.uuid] = o.state ? o.state.name : o.uuid;
                         return map;
                     }, {});
+                    
+                    // Detectar jugadores que salieron
+                    const leftPlayers = players.filter(id => !newPlayers.includes(id));
+                    
+                    // Actualizar listas
+                    players = newPlayers;
+                    playersMap = newPlayersMap;
 
+                    // Actualizar UI
                     document.getElementById('player-count').innerText = "Jugadores conectados: " + players.length + " 👥";
                     const listEl = document.getElementById('player-list');
                     listEl.innerHTML = '';
-                    Object.values(playersMap).forEach(name => {
+                    players.forEach(id => {
                         const li = document.createElement('li');
-                        li.innerText = name;
+                        li.innerText = playersMap[id] || id;
                         listEl.appendChild(li);
                     });
 
-                    if (gamePhase !== 'lobby') updateActivePlayers();
+                    // Si estamos en juego, actualizar activePlayers para eliminar desconectados
+                    if (gamePhase !== 'lobby' && leftPlayers.length > 0) {
+                        leftPlayers.forEach(leftId => {
+                            if (activePlayers.includes(leftId)) {
+                                activePlayers = activePlayers.filter(id => id !== leftId);
+                                if (!eliminated.includes(leftId)) {
+                                    eliminated.push(leftId);
+                                }
+                                console.log("Jugador desconectado durante juego:", leftId);
+                            }
+                        });
+                    }
                 } else {
                     console.error("Error en hereNow:", s);
                 }
