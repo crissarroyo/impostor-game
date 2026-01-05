@@ -7,63 +7,222 @@
     <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <style>
-        :root { --primary: #e74c3c; --accent: #f1c40f; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --font-size-base: 1.1rem; }
-        body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; text-align: center; font-size: var(--font-size-base); }
-        h1, h2, h3, p, label, button, input, select { font-size: var(--font-size-base); }
-        .container { width: 95%; max-width: 420px; margin: auto; padding: 15px; box-sizing: border-box; }
-        .setup-box { background: var(--card); padding: 15px; border-radius: 15px; border: 1px solid #334155; margin-bottom: 10px; text-align: left; }
-        .btn-main { background: var(--primary); color: white; border: none; padding: 16px; border-radius: 50px; width: 100%; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        .room-code { font-size: 2.2rem; color: var(--accent); letter-spacing: 5px; font-weight: bold; text-align: center; margin: 5px 0; }
-        .screen { display: none; }
-        .active { display: block; }
-        .input-dark { background: #0f172a; color: white; border: 1px solid #475569; padding: 10px; border-radius: 8px; width: 100%; box-sizing: border-box; margin-top: 5px; font-size: var(--font-size-base); }
-        .input-number { width: 60px; padding-right: 30px; } /* Ajuste para flechas */
-        .card { width: 260px; height: 350px; background: #f8fafc; border-radius: 25px; margin: 20px auto; color: #1e293b; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 5px solid var(--primary); filter: blur(25px); transition: 0.3s; }
-        .word { font-size: 2rem; color: #3b82f6; font-weight: 900; text-transform: uppercase; margin-top: 10px; border-bottom: 4px solid; }
-        .timer { font-size: 3rem; font-weight: bold; color: var(--accent); margin: 10px 0; }
-        .vote-timer { font-size: 1.5rem; color: var(--accent); margin: 10px 0; }
-        /* Spinner */
-        .spinner { display: none; margin: 20px auto; border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid var(--accent); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        ul.player-list { list-style: none; padding: 0; opacity: 0.8; }
-        ul.player-list li { margin: 5px 0; font-size: var(--font-size-base); }
-        /* Versión Beta */
-        .version { position: fixed; bottom: 10px; right: 10px; color: var(--text); opacity: 0.5; font-size: 0.8rem; z-index: 1000; }
-        /* Voting */
-        .vote-btn { background: #3b82f6; color: white; border: none; padding: 8px; border-radius: 8px; margin-left: 10px; cursor: pointer; font-size: var(--font-size-base); }
-        .voted { background: #22c55e; }
-        /* Results */
-        .results-bar { background: #475569; height: 20px; margin: 5px 0; border-radius: 5px; }
-        .results-fill { background: var(--accent); height: 100%; border-radius: 5px; }
-        /* Animación para input nombre */
-        @keyframes pulse { 0% { border-color: #475569; } 50% { border-color: var(--accent); } 100% { border-color: #475569; } }
-        .pulse-animation { animation: pulse 1.5s infinite; }
-        /* Categories */
-        .categories-list { max-height: 200px; overflow-y: auto; }
-        .categories-list label { display: block; }
-        .btn-small { padding: 5px 10px; border-radius: 5px; font-size: 0.9rem; margin: 0 5px; background: #3b82f6; color: white; border: none; cursor: pointer; }
+        :root {
+            --primary: #e74c3c;
+            --accent: #f1c40f;
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f8fafc;
+            --font-size-base: 1.1rem;
+        }
+        body {
+            font-family: system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            text-align: center;
+            font-size: var(--font-size-base);
+        }
+        h1, h2, h3, p, label, button, input, select {
+            font-size: var(--font-size-base);
+        }
+        .container {
+            width: 95%;
+            max-width: 420px;
+            margin: auto;
+            padding: 15px;
+            box-sizing: border-box;
+        }
+        .setup-box {
+            background: var(--card);
+            padding: 15px;
+            border-radius: 15px;
+            border: 1px solid #334155;
+            margin-bottom: 10px;
+            text-align: left;
+        }
+        .btn-main {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 50px;
+            width: 100%;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .room-code {
+            font-size: 2.2rem;
+            color: var(--accent);
+            letter-spacing: 5px;
+            font-weight: bold;
+            text-align: center;
+            margin: 5px 0;
+        }
+        .screen {
+            display: none;
+        }
+        .active {
+            display: block;
+        }
+        .input-dark {
+            background: #0f172a;
+            color: white;
+            border: 1px solid #475569;
+            padding: 10px;
+            border-radius: 8px;
+            width: 100%;
+            box-sizing: border-box;
+            margin-top: 5px;
+            font-size: var(--font-size-base);
+        }
+        .input-number {
+            width: 60px;
+            padding-right: 30px;
+        }
+        .card {
+            width: 260px;
+            height: 350px;
+            background: #f8fafc;
+            border-radius: 25px;
+            margin: 20px auto;
+            color: #1e293b;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border: 5px solid var(--primary);
+            filter: blur(25px);
+            transition: 0.3s;
+        }
+        .word {
+            font-size: 2rem;
+            color: #3b82f6;
+            font-weight: 900;
+            text-transform: uppercase;
+            margin-top: 10px;
+            border-bottom: 4px solid;
+        }
+        .timer {
+            font-size: 3rem;
+            font-weight: bold;
+            color: var(--accent);
+            margin: 10px 0;
+        }
+        .vote-timer {
+            font-size: 1.5rem;
+            color: var(--accent);
+            margin: 10px 0;
+        }
+        .spinner {
+            display: none;
+            margin: 20px auto;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top: 4px solid var(--accent);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        ul.player-list {
+            list-style: none;
+            padding: 0;
+            opacity: 0.8;
+        }
+        ul.player-list li {
+            margin: 5px 0;
+            font-size: var(--font-size-base);
+        }
+        .version {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            color: var(--text);
+            opacity: 0.5;
+            font-size: 0.8rem;
+            z-index: 1000;
+        }
+        .vote-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 8px;
+            border-radius: 8px;
+            margin-left: 10px;
+            cursor: pointer;
+            font-size: var(--font-size-base);
+        }
+        .voted {
+            background: #22c55e;
+        }
+        .results-bar {
+            background: #475569;
+            height: 20px;
+            margin: 5px 0;
+            border-radius: 5px;
+        }
+        .results-fill {
+            background: var(--accent);
+            height: 100%;
+            border-radius: 5px;
+        }
+        @keyframes pulse {
+            0% { border-color: #475569; }
+            50% { border-color: var(--accent); }
+            100% { border-color: #475569; }
+        }
+        .pulse-animation {
+            animation: pulse 1.5s infinite;
+        }
+        .categories-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .categories-list label {
+            display: block;
+        }
+        .btn-small {
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            margin: 0 5px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
-
     <div class="container">
         <div id="home-screen" class="screen active">
             <h1>🕵️‍♂️ EL IMPOSTOR</h1>
             <div class="setup-box">
-                <label>Tu Nombre: <input type="text" id="player-name" placeholder="Ej: Juan" class="input-dark" maxlength="15" required></label><br><br>
+                <label>Tu Nombre:
+                    <input type="text" id="player-name" placeholder="Ej: Juan" class="input-dark" maxlength="15" required></label><br><br>
                 <div id="host-config">
                     <div class="setup-box">
-                        <label>📏 Máx Jugadores: <input type="number" id="max-players" value="10" min="3" max="20" class="input-dark input-number"></label><br><br>
-                        <label>😈 Impostores: <input type="number" id="num-imp" value="1" min="1" class="input-dark input-number"></label><br><br>
-                        <label>🤡 Charlatanes: <input type="number" id="num-char" value="0" min="0" class="input-dark input-number"></label><br><br>
-                        <label>⏱ Tiempo por Ronda: 
+                        <label>📏 Máx Jugadores:
+                            <input type="number" id="max-players" value="10" min="3" max="20" class="input-dark input-number"></label><br><br>
+                        <label>😈 Impostores:
+                            <input type="number" id="num-imp" value="1" min="1" class="input-dark input-number"></label><br><br>
+                        <label>🤡 Charlatanes:
+                            <input type="number" id="num-char" value="0" min="0" class="input-dark input-number"></label><br><br>
+                        <label>⏱ Tiempo por Ronda:
                             <select id="round-time" class="input-dark" style="width: 100px;">
                                 <option value="30">30 seg</option>
                                 <option value="60">1 min</option>
                                 <option value="120">2 min</option>
                             </select>
                         </label><br><br>
-                        <label>Categorías: <button class="btn-small" onclick="toggleAllCategories(true)">Todas</button> <button class="btn-small" onclick="toggleAllCategories(false)">Ninguna</button></label>
+                        <label>Categorías:
+                            <button class="btn-small" onclick="toggleAllCategories(true)">Todas</button>
+                            <button class="btn-small" onclick="toggleAllCategories(false)">Ninguna</button></label>
                         <div class="categories-list" id="categories-list"></div>
                     </div>
                 </div>
@@ -131,6 +290,7 @@
         <div id="game-over-screen" class="screen">
             <h2>¡Juego Terminado! 🎉</h2>
             <p id="game-result"></p>
+            <div id="game-over-reason" style="margin: 15px 0; font-weight: bold;"></div>
             <button class="btn-main" onclick="exitGame()" style="background:#475569">SALIR 🚪</button>
             <div id="host-restart" style="display:none"><button class="btn-main" style="background:#22c55e" onclick="restartGame()">REINICIAR SALA 🔄</button></div>
         </div>
@@ -152,8 +312,7 @@
         </div>
     </div>
 
-    <!-- Versión Beta -->
-    <div class="version">beta 0.8.4.10</div>
+    <div class="version">beta 0.8.5.0</div>
 
     <script>
         const DB = {
@@ -176,7 +335,7 @@
 
         let pubnub, channel, isHost = false, myId = "P-" + Math.floor(Math.random() * 999999), playerName = "";
         let players = [], playersMap = {}, activePlayers = [], refreshInterval, myRole = {}, votes = {}, votedPlayers = new Set(), timerInterval, voteTimerInterval;
-        let gamePhase = 'lobby'; // lobby, roles, round, voting, results, game_over
+        let gamePhase = 'lobby';
         let impostors = [], charlatans = [], citizens = [], eliminated = [], roundTime = 60, isSpectator = false;
         let selectedCategories = Object.keys(DB);
         let fullRoles = {};
@@ -194,7 +353,7 @@
                 checkbox.value = cat;
                 checkbox.onchange = updateSelectedCategories;
                 label.appendChild(checkbox);
-                label.appendChild(document.createTextNode(cat));
+                label.appendChild(document.createTextNode(' ' + cat));
                 list.appendChild(label);
             });
         }
@@ -208,7 +367,6 @@
             selectedCategories = Array.from(document.querySelectorAll('#categories-list input[type="checkbox"]:checked')).map(cb => cb.value);
         }
 
-        // Chequear reconexión al load
         window.addEventListener('load', () => {
             initCategories();
         });
@@ -216,6 +374,7 @@
         function startSession(mode) {
             playerName = document.getElementById('player-name').value.trim();
             if (!playerName) return alert("Ingresa tu nombre.");
+
             localStorage.setItem('playerName', playerName);
             localStorage.setItem('myId', myId);
 
@@ -228,6 +387,7 @@
                 code = document.getElementById('join-input').value.toUpperCase();
                 if (code.length !== 4) return alert("Código inválido.");
             }
+
             channel = code;
             localStorage.setItem('channel', channel);
 
@@ -247,7 +407,9 @@
         }
 
         function checkRoomSizeBeforeJoin(callback) {
-            pubnub.hereNow({ channels: [channel] }, (s, r) => {
+            pubnub.hereNow({
+                channels: [channel]
+            }, (s, r) => {
                 if (r && r.totalOccupancy >= maxPlayers) {
                     alert("Sala llena. Máximo: " + maxPlayers + ".");
                     showScreen('home-screen');
@@ -293,8 +455,14 @@
                             votedPlayers.add(m.publisher);
                             if (isSpectator) updateSpectatorVoteProgress();
                             if (isHost) {
-                                pubnub.publish({ channel: channel, message: { type: "vote_update", votes: votes } });
-                                if (votedPlayers.size === activePlayers.length) publishResults();
+                                pubnub.publish({
+                                    channel: channel,
+                                    message: { type: "vote_update", votes: votes }
+                                });
+                                if (votedPlayers.size === activePlayers.length) {
+                                    clearTimeout(voteTimeout);
+                                    publishResults();
+                                }
                             }
                         }
                     } else if (msg.type === "vote_update") {
@@ -303,11 +471,11 @@
                             updateSpectatorVoteProgress();
                         }
                     } else if (msg.type === "results") {
-                        showResults(msg.votes, msg.mostVoted, msg.eliminated);
+                        showResults(msg.votes, msg.mostVoted, msg.eliminated, msg.eliminatedRole);
                     } else if (msg.type === "next_round") {
                         nextRoundClient();
                     } else if (msg.type === "game_over") {
-                        gameOver(msg.winner);
+                        gameOver(msg.winner, msg.reason);
                     } else if (msg.type === "restart") {
                         location.reload();
                     } else if (msg.type === "sync") {
@@ -323,19 +491,48 @@
                         }
                     } else if (msg.type === "config") {
                         maxPlayers = msg.maxPlayers;
+                    } else if (msg.type === "host_disconnect") {
+                        alert("El host se desconectó. La partida ha terminado.");
+                        exitGame();
                     }
                 },
                 presence: (p) => {
                     if (p.action === "join" || p.action === "leave" || p.action === "state-change" || p.action === "timeout") {
                         updatePlayersList();
+                        if (p.action === "leave" || p.action === "timeout") {
+                            const leavingPlayer = p.uuid;
+                            if (isHost && leavingPlayer !== myId) {
+                                // Si un jugador activo se desconecta durante el juego
+                                if (gamePhase !== 'lobby' && activePlayers.includes(leavingPlayer)) {
+                                    activePlayers = activePlayers.filter(id => id !== leavingPlayer);
+                                    eliminated.push(leavingPlayer);
+                                }
+                            }
+                            // Si el host se desconecta
+                            if (!isHost && players.length > 0 && players[0] === leavingPlayer) {
+                                pubnub.publish({
+                                    channel: channel,
+                                    message: { type: "host_disconnect" }
+                                });
+                                alert("El host se desconectó. La partida ha terminado.");
+                                exitGame();
+                            }
+                        }
                     }
                 }
             });
 
-            pubnub.subscribe({ channels: [channel], withPresence: true });
+            pubnub.subscribe({
+                channels: [channel],
+                withPresence: true
+            });
 
             if (isHost) {
-                pubnub.publish({ channel: channel, message: { type: "config", maxPlayers: maxPlayers } });
+                pubnub.publish({
+                    channel: channel,
+                    message: { type: "config", maxPlayers: maxPlayers }
+                });
+
                 const qr = qrcode(0, 'M');
                 const baseUrl = window.location.origin + window.location.pathname;
                 qr.addData(baseUrl + "?room=" + channel);
@@ -352,13 +549,17 @@
         }
 
         function updatePlayersList() {
-            pubnub.hereNow({ channels: [channel], includeState: true }, (s, r) => {
+            pubnub.hereNow({
+                channels: [channel],
+                includeState: true
+            }, (s, r) => {
                 if (r && r.channels && r.channels[channel]) {
                     players = r.channels[channel].occupants.map(o => o.uuid);
                     playersMap = r.channels[channel].occupants.reduce((map, o) => {
                         map[o.uuid] = o.state ? o.state.name : o.uuid;
                         return map;
                     }, {});
+
                     document.getElementById('player-count').innerText = "Jugadores conectados: " + players.length + " 👥";
                     const listEl = document.getElementById('player-list');
                     listEl.innerHTML = '';
@@ -367,6 +568,7 @@
                         li.innerText = name;
                         listEl.appendChild(li);
                     });
+
                     if (gamePhase !== 'lobby') updateActivePlayers();
                 } else {
                     console.error("Error en hereNow:", s);
@@ -376,12 +578,12 @@
 
         function distributeRoles() {
             if (players.length < 3) alert("Para testing ok, pero ideal ≥3 jugadores.");
+
             const nImp = parseInt(document.getElementById('num-imp').value);
             const nChar = parseInt(document.getElementById('num-char').value);
             roundTime = parseInt(document.getElementById('round-time').value);
 
             if (nImp + nChar > players.length) return alert("Impostores + Charlatanes no pueden exceder jugadores (" + players.length + ").");
-
             if (selectedCategories.length === 0) return alert("Selecciona al menos una categoría.");
 
             const cat = selectedCategories[Math.floor(Math.random() * selectedCategories.length)];
@@ -395,16 +597,18 @@
             charlatans = [];
             citizens = [];
 
-            for(let i=0; i<nImp && pool.length; i++) {
-                let id = pool.splice(Math.floor(Math.random()*pool.length), 1)[0];
+            for (let i = 0; i < nImp && pool.length; i++) {
+                let id = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
                 roles[id] = { role: "IMPOSTOR", icon: "😈", word: "Categoría: " + cat };
                 impostors.push(id);
             }
-            for(let i=0; i<nChar && pool.length; i++) {
-                let id = pool.splice(Math.floor(Math.random()*pool.length), 1)[0];
-                roles[id] = { role: "CHARLATÁN", icon: "🤡", word: fake };
+
+            for (let i = 0; i < nChar && pool.length; i++) {
+                let id = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+                roles[id] = { role: "CIUDADANO", icon: "😇", word: fake };
                 charlatans.push(id);
             }
+
             pool.forEach(id => {
                 roles[id] = { role: "CIUDADANO", icon: "😇", word: secret };
                 citizens.push(id);
@@ -412,12 +616,17 @@
 
             activePlayers = [...players];
             fullRoles = roles;
-            pubnub.publish({ channel: channel, message: { type: "assign", roles: roles, activePlayers: activePlayers } });
+
+            pubnub.publish({
+                channel: channel,
+                message: { type: "assign", roles: roles, activePlayers: activePlayers }
+            });
         }
 
         function handleAssignRoles(msg) {
             const data = msg.roles[myId];
             activePlayers = msg.activePlayers || [];
+
             if (data) {
                 myRole = data;
                 localStorage.setItem('myRole', JSON.stringify(myRole));
@@ -426,20 +635,28 @@
                 document.getElementById('my-word').innerText = data.word;
                 showScreen('role-screen');
                 gamePhase = 'roles';
+
                 if (isHost) document.getElementById('host-start-timer').style.display = 'block';
                 else document.getElementById('wait-host').style.display = 'block';
             }
         }
 
         function startRound() {
-            pubnub.publish({ channel: channel, message: { type: "start_round", time: roundTime } });
+            pubnub.publish({
+                channel: channel,
+                message: { type: "start_round", time: roundTime }
+            });
             document.getElementById('host-start-timer').style.display = 'none';
-            if (isHost) pubnub.publish({ channel: channel, message: { type: "phase_update", status: "Ronda en progreso... ⏳" } });
+            if (isHost) pubnub.publish({
+                channel: channel,
+                message: { type: "phase_update", status: "Ronda en progreso... ⏳" }
+            });
         }
 
         function startLocalTimer(duration) {
             document.getElementById('timer-display').style.display = "block";
             document.getElementById('wait-host').style.display = "none";
+
             let timer = duration;
             timerInterval = setInterval(() => {
                 let mins = Math.floor(timer / 60);
@@ -448,24 +665,31 @@
                 if (--timer < 0) {
                     clearInterval(timerInterval);
                     document.getElementById('timer-display').innerText = "¡TIEMPO! ⏰";
-                    if(navigator.vibrate) navigator.vibrate([500, 200, 500]);
+                    if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
                     startVoting();
                 }
             }, 1000);
         }
+
+        let voteTimeout;
 
         function startVoting() {
             if (isSpectator) {
                 showScreen('spectator-screen');
                 document.getElementById('spectator-status').innerText = "Votación en progreso... 🗳️";
                 updateSpectatorVoteProgress();
-                if (isHost) pubnub.publish({ channel: channel, message: { type: "phase_update", status: "Votación en progreso... 🗳️" } });
+                if (isHost) pubnub.publish({
+                    channel: channel,
+                    message: { type: "phase_update", status: "Votación en progreso... 🗳️" }
+                });
                 return;
             }
+
             showScreen('voting-screen');
             gamePhase = 'voting';
             votes = {};
             votedPlayers = new Set();
+
             const voteList = document.getElementById('vote-list');
             voteList.innerHTML = '';
             activePlayers.forEach(id => {
@@ -479,9 +703,14 @@
                 li.appendChild(btn);
                 voteList.appendChild(li);
             });
+
             startVoteTimer(30);
-            if (isHost) pubnub.publish({ channel: channel, message: { type: "phase_update", status: "Votación en progreso... 🗳️" } });
-            if (isHost) setTimeout(publishResults, 30000);
+            if (isHost) pubnub.publish({
+                channel: channel,
+                message: { type: "phase_update", status: "Votación en progreso... 🗳️" }
+            });
+
+            if (isHost) voteTimeout = setTimeout(publishResults, 30000);
         }
 
         function startVoteTimer(duration) {
@@ -498,12 +727,15 @@
         }
 
         function sendVote(target, btn) {
-            pubnub.publish({ channel: channel, message: { type: "vote", target: target } });
+            pubnub.publish({
+                channel: channel,
+                message: { type: "vote", target: target }
+            });
             btn.classList.add('voted');
             btn.innerText = 'Votado ✅';
             btn.disabled = true;
             console.log("Voto enviado a", target);
-            // Ocultar botones después de votar
+
             document.querySelectorAll('.vote-btn').forEach(b => b.disabled = true);
             document.getElementById('vote-status').innerText = "Voto registrado. Espera resultados... ⏱";
         }
@@ -518,27 +750,60 @@
                     mostVoted.push(id);
                 }
             });
-            const eliminatedId = mostVoted[Math.floor(Math.random() * mostVoted.length)]; // Si empate, random
+
+            const eliminatedId = mostVoted[Math.floor(Math.random() * mostVoted.length)];
             eliminated.push(eliminatedId);
             activePlayers = activePlayers.filter(id => id !== eliminatedId);
+
             const isImpostor = impostors.includes(eliminatedId);
-            impostors = impostors.filter(id => id !== eliminatedId);
-            charlatans = charlatans.filter(id => id !== eliminatedId);
-            citizens = citizens.filter(id => id !== eliminatedId);
-            pubnub.publish({ channel: channel, message: { type: "results", votes: votes, mostVoted: playersMap[eliminatedId], eliminated: eliminatedId, isImpostor: isImpostor } });
+            const isCharlatanEliminated = charlatans.includes(eliminatedId);
+            
+            let eliminatedRole = "CIUDADANO";
+            if (isImpostor) {
+                eliminatedRole = "IMPOSTOR";
+                impostors = impostors.filter(id => id !== eliminatedId);
+            } else if (isCharlatanEliminated) {
+                eliminatedRole = "CHARLATÁN";
+                charlatans = charlatans.filter(id => id !== eliminatedId);
+            } else {
+                citizens = citizens.filter(id => id !== eliminatedId);
+            }
+
+            pubnub.publish({
+                channel: channel,
+                message: {
+                    type: "results",
+                    votes: votes,
+                    mostVoted: playersMap[eliminatedId],
+                    eliminated: eliminatedId,
+                    eliminatedRole: eliminatedRole
+                }
+            });
+
             if (!hasPublishedRolesToSpectators && eliminated.length > 0) {
-                pubnub.publish({ channel: channel, message: { type: "spectator_roles", roles: fullRoles } });
+                pubnub.publish({
+                    channel: channel,
+                    message: { type: "spectator_roles", roles: fullRoles }
+                });
                 hasPublishedRolesToSpectators = true;
             }
-            checkGameOver();
+
+            setTimeout(() => checkGameOver(), 1000);
         }
 
-        function showResults(votesData, mostVoted, eliminatedId) {
+        function showResults(votesData, mostVoted, eliminatedId, eliminatedRole) {
+            if (isSpectator) {
+                document.getElementById('spectator-status').innerText = `Resultados: ${mostVoted} fue expulsado (${eliminatedRole})`;
+                return;
+            }
+
             showScreen('results-screen');
             gamePhase = 'results';
+
             const resultsList = document.getElementById('results-list');
             resultsList.innerHTML = '';
-            const maxVotes = Math.max(...Object.values(votesData), 1); // Evitar división por 0
+            const maxVotes = Math.max(...Object.values(votesData), 1);
+
             Object.keys(votesData).forEach(id => {
                 const li = document.createElement('li');
                 li.innerText = `${playersMap[id]}: ${votesData[id]} votos 🗳️`;
@@ -551,54 +816,92 @@
                 li.appendChild(bar);
                 resultsList.appendChild(li);
             });
-            document.getElementById('most-voted').innerText = `Expulsado: ${mostVoted} ${impostors.includes(eliminatedId) ? '😈 (Impostor)' : '😇 (Ciudadano)'} `;
+
+            const roleIcon = eliminatedRole === "IMPOSTOR" ? "😈" : (eliminatedRole === "CHARLATÁN" ? "🤡" : "😇");
+            document.getElementById('most-voted').innerText = `Expulsado: ${mostVoted} ${roleIcon} (${eliminatedRole})`;
+
             if (myId === eliminatedId) {
                 isSpectator = true;
                 showScreen('spectator-screen');
-                document.getElementById('spectator-status').innerText = `Has sido expulsado ${impostors.includes(myId) ? '😈' : '😇'}. Observa el juego.`;
+                document.getElementById('spectator-status').innerText = `Has sido expulsado ${roleIcon} (${eliminatedRole}). Observa el juego.`;
             }
-            if (isHost && impostors.length > 0) document.getElementById('host-next-round').style.display = 'block';
-            if (isHost) pubnub.publish({ channel: channel, message: { type: "phase_update", status: "Resultados mostrados 📊" } });
+
+            if (isHost && impostors.length > 0 && activePlayers.length > 2) {
+                document.getElementById('host-next-round').style.display = 'block';
+            }
+
+            if (isHost) pubnub.publish({
+                channel: channel,
+                message: { type: "phase_update", status: "Resultados mostrados 📊" }
+            });
         }
 
         function nextRound() {
-            pubnub.publish({ channel: channel, message: { type: "next_round" } });
+            document.getElementById('host-next-round').style.display = 'none';
+            pubnub.publish({
+                channel: channel,
+                message: { type: "next_round" }
+            });
         }
 
         function nextRoundClient() {
-            showScreen('role-screen');
-            document.getElementById('timer-display').style.display = 'none';
-            document.getElementById('wait-host').style.display = 'block';
-            if (isHost) document.getElementById('host-start-timer').style.display = 'block';
             if (isSpectator) {
                 showScreen('spectator-screen');
-                document.getElementById('spectator-status').innerText = "Espera nueva ronda... ⏳";
+                document.getElementById('spectator-status').innerText = "Nueva ronda iniciando... ⏳";
+            } else {
+                showScreen('role-screen');
+                document.getElementById('timer-display').style.display = 'none';
+                document.getElementById('wait-host').style.display = 'block';
+                if (isHost) document.getElementById('host-start-timer').style.display = 'block';
             }
+
             gamePhase = 'roles';
-            if (isHost) pubnub.publish({ channel: channel, message: { type: "phase_update", status: "Espera nueva ronda... ⏳" } });
+            if (isHost) pubnub.publish({
+                channel: channel,
+                message: { type: "phase_update", status: "Nueva ronda iniciando... ⏳" }
+            });
         }
 
         function checkGameOver() {
+            let winner = null;
+            let reason = "";
+
             if (impostors.length === 0) {
-                pubnub.publish({ channel: channel, message: { type: "game_over", winner: "Ciudadanos" } });
-            } else if (activePlayers.length <= 2 && impostors.length > 0) {
-                pubnub.publish({ channel: channel, message: { type: "game_over", winner: "Impostores" } });
+                winner = "Ciudadanos";
+                reason = "Todos los impostores han sido eliminados. 🎉";
+            } else if (activePlayers.length <= impostors.length) {
+                winner = "Impostores";
+                reason = "Los impostores igualan o superan a los ciudadanos. 😈";
+            }
+
+            if (winner) {
+                pubnub.publish({
+                    channel: channel,
+                    message: { type: "game_over", winner: winner, reason: reason }
+                });
             }
         }
 
-        function gameOver(winner) {
+        function gameOver(winner, reason) {
             showScreen('game-over-screen');
             document.getElementById('game-result').innerText = `¡${winner} ganan! ${winner === 'Ciudadanos' ? '😇' : '😈'}`;
+            document.getElementById('game-over-reason').innerText = reason;
             if (isHost) document.getElementById('host-restart').style.display = 'block';
         }
 
         function restartGame() {
-            pubnub.publish({ channel: channel, message: { type: "restart" } });
+            pubnub.publish({
+                channel: channel,
+                message: { type: "restart" }
+            });
             location.reload();
         }
 
         function syncGameState() {
-            pubnub.publish({ channel: channel, message: { type: "sync_request" } });
+            pubnub.publish({
+                channel: channel,
+                message: { type: "sync_request" }
+            });
         }
 
         function handleSync(msg) {
@@ -608,6 +911,7 @@
                 eliminated = msg.eliminated;
                 impostors = msg.impostors;
                 isSpectator = eliminated.includes(myId);
+
                 if (gamePhase === 'roles' || gamePhase === 'round') {
                     myRole = JSON.parse(localStorage.getItem('myRole')) || {};
                     if (myRole.role) {
@@ -621,39 +925,46 @@
                 } else if (gamePhase === 'voting') {
                     startVoting();
                 } else if (gamePhase === 'results') {
-                    showResults(msg.votes, msg.mostVoted, msg.eliminated);
+                    showResults(msg.votes, msg.mostVoted, msg.eliminated, msg.eliminatedRole);
                 } else if (gamePhase === 'game_over') {
-                    gameOver(msg.winner);
+                    gameOver(msg.winner, msg.reason);
                 }
             }
         }
 
         function updateActivePlayers() {
-            // Lógica para sync active players si needed
+            // Actualización de jugadores activos si es necesario
         }
 
         function updateSpectatorVoteProgress() {
             const progressList = document.getElementById('spectator-vote-progress');
-            progressList.innerHTML = '';
+            progressList.innerHTML = '<h3>Progreso de Votación:</h3>';
             activePlayers.forEach(id => {
                 const li = document.createElement('li');
-                li.innerText = `${playersMap[id]}: Votos - ${votes[id] || 0} ${votedPlayers.has(id) ? ' (Ha votado ✅)' : ' (Pendiente ⏳)'}`;
+                li.innerText = `${playersMap[id]}: Votos recibidos - ${votes[id] || 0} ${votedPlayers.has(id) ? ' (Ha votado ✅)' : ' (Pendiente ⏳)'}`;
                 progressList.appendChild(li);
             });
         }
 
         function updateSpectatorRoles() {
             const rolesList = document.getElementById('spectator-roles');
-            rolesList.innerHTML = '';
+            rolesList.innerHTML = '<h3>Roles de Todos los Jugadores:</h3>';
             Object.keys(fullRoles).forEach(id => {
                 const roleData = fullRoles[id];
                 const li = document.createElement('li');
-                li.innerText = `${playersMap[id]}: ${roleData.role} ${roleData.icon} - Palabra: ${roleData.word}`;
+                const status = eliminated.includes(id) ? ' (Expulsado 🚫)' : ' (Activo ✅)';
+                li.innerText = `${playersMap[id]}: ${roleData.role} ${roleData.icon} - ${roleData.word}${status}`;
                 rolesList.appendChild(li);
             });
         }
 
         function exitGame() {
+            if (isHost) {
+                pubnub.publish({
+                    channel: channel,
+                    message: { type: "host_disconnect" }
+                });
+            }
             localStorage.clear();
             location.reload();
         }
@@ -664,7 +975,6 @@
             clearInterval(refreshInterval);
         }
 
-        // Soporte para entrar directo por link
         const params = new URLSearchParams(window.location.search);
         if (params.has('room')) {
             document.getElementById('join-input').value = params.get('room');
