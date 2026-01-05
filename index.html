@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Impostor Pro Multi 🕵️‍♂️</title>
+    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <style>
+        :root { --primary: #e74c3c; --accent: #f1c40f; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --citizen: #3b82f6; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; text-align: center; overflow-x: hidden; }
+        .container { width: 95%; max-width: 420px; margin: auto; padding: 15px; box-sizing: border-box; }
+        .setup-box { background: var(--card); padding: 15px; border-radius: 20px; border: 1px solid #334155; margin-bottom: 15px; box-sizing: border-box; width: 100%; }
+        .btn-main { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 50px; width: 100%; font-weight: bold; cursor: pointer; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .btn-main:disabled { opacity: 0.4; cursor: not-allowed; }
+        .room-code { font-size: 2.2rem; color: var(--accent); letter-spacing: 5px; font-weight: bold; margin: 10px 0; }
+        #qrcode { background: white; padding: 10px; display: inline-block; border-radius: 10px; margin: 10px 0; }
+        .screen { display: none; }
+        .active { display: block; }
+        .card { width: 280px; height: 380px; background: #f8fafc; border-radius: 25px; margin: 20px auto; color: #1e293b; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 5px solid var(--primary); transition: 0.5s; }
+        .role-icon { font-size: 80px; }
+        .word { font-size: 2rem; color: var(--citizen); font-weight: bold; text-decoration: underline; margin-top: 10px; }
+        .category-scroll { height: 120px; overflow-y: auto; background: #0f172a; border-radius: 10px; padding: 5px; text-align: left; }
+        .cat-item { display: flex; align-items: center; padding: 8px; border-bottom: 1px solid #1e293b; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div id="home-screen" class="screen active">
+            <h1>🕵️‍♂️ EL IMPOSTOR</h1>
+            <div class="setup-box">
+                <button class="btn-main" onclick="hostGame()">CREAR NUEVA SALA 🏠</button>
+                <div style="margin: 20px 0; opacity: 0.5;">— O —</div>
+                <input type="text" id="join-input" placeholder="CÓDIGO" style="padding:12px; border-radius:10px; width:60%; text-align:center; font-size: 1.2rem; border: 1px solid #475569; background: #0f172a; color: white;">
+                <button class="btn-main" style="background:#3b82f6; margin-top:10px;" onclick="joinGame()">UNIRSE A PARTIDA 📱</button>
+            </div>
+        </div>
+
+        <div id="lobby-screen" class="screen">
+            <h2 id="lobby-status">Sala de Espera</h2>
+            <div class="setup-box">
+                <div class="room-code" id="display-code">----</div>
+                <div id="qrcode"></div>
+                <p id="player-count">Esperando jugadores...</p>
+            </div>
+            <div id="host-controls" style="display:none">
+                <div class="setup-box">
+                    <span style="font-size:0.8rem; color:var(--accent)">CONFIGURACIÓN</span>
+                    <div style="display:flex; gap:10px; margin-top:10px;">
+                        <div style="flex:1">Impostores<input type="number" id="num-imp" value="1" min="1" style="width:100%; padding:5px; text-align:center;"></div>
+                        <div style="flex:1">Charlatanes<input type="number" id="num-char" value="0" min="0" style="width:100%; padding:5px; text-align:center;"></div>
+                    </div>
+                </div>
+                <button class="btn-main" onclick="distributeRoles()">¡REPARTIR ROLES! 📦</button>
+            </div>
+        </div>
+
+        <div id="role-screen" class="screen">
+            <h3 id="role-status-msg">Tu secreto:</h3>
+            <div class="card" id="my-card" onclick="this.style.filter='none'">
+                <div id="my-icon" class="role-icon">❓</div>
+                <h2 id="my-role">TOCA PARA VER</h2>
+                <div id="my-word" class="word"></div>
+            </div>
+            <p style="opacity:0.6; font-size:0.8rem;">No dejes que nadie vea tu pantalla</p>
+        </div>
+    </div>
+
+    <script>
+        // BASE DE DATOS INTERNA
+        const DB = {
+            "Países 🌎": ["México", "España", "Brasil", "Japón", "Francia", "Italia", "Canadá", "Alemania"],
+            "Animales 🦁": ["León", "Tigre", "Elefante", "Lobo", "Delfín", "Águila", "Gorila", "Zorro"],
+            "Comida 🍕": ["Pizza", "Tacos", "Sushi", "Hamburguesa", "Pasta", "Pastel", "Ensalada"]
+        };
+
+        let pubnub, myChannel, isHost = false, myId = "P-" + Math.random().toString(36).substr(2, 4).toUpperCase();
+        let players = [];
+
+        function initPubNub(channel) {
+            pubnub = new PubNub({
+                publishKey: 'pub-c-4638a1f8-084b-449e-b996-039c381f887f',
+                subscribeKey: 'sub-c-10902830-67c8-4721-91a9-d65e23616618',
+                userId: myId
+            });
+            myChannel = channel;
+            pubnub.subscribe({ channels: [myChannel] });
+            pubnub.addListener({
+                message: (m) => {
+                    if (m.message.type === "new_player" && isHost) {
+                        if(!players.includes(m.message.id)) players.push(m.message.id);
+                        updateLobby();
+                    }
+                    if (m.message.type === "assign_role") {
+                        showRole(m.message.roles[myId]);
+                    }
+                }
+            });
+            if(!isHost) pubnub.publish({ channel: myChannel, message: { type: "new_player", id: myId } });
+        }
+
+        function hostGame() {
+            isHost = true;
+            const code = Math.random().toString(36).substr(2, 4).toUpperCase();
+            document.getElementById('display-code').innerText = code;
+            document.getElementById('host-controls').style.display = 'block';
+            players = [myId];
+            const qr = qrcode(0, 'M');
+            qr.addData(window.location.origin + window.location.pathname + '?room=' + code);
+            qr.make();
+            document.getElementById('qrcode').innerHTML = qr.createImgTag(4);
+            showScreen('lobby-screen');
+            initPubNub(code);
+            updateLobby();
+        }
+
+        function joinGame() {
+            const code = document.getElementById('join-input').value.toUpperCase();
+            if(code.length !== 4) return alert("Código de 4 letras");
+            document.getElementById('display-code').innerText = code;
+            showScreen('lobby-screen');
+            initPubNub(code);
+        }
+
+        function updateLobby() {
+            document.getElementById('player-count').innerText = `Jugadores: ${players.length}`;
+        }
+
+        function distributeRoles() {
+            let numImp = parseInt(document.getElementById('num-imp').value);
+            let numChar = parseInt(document.getElementById('num-char').value);
+            
+            const cats = Object.keys(DB);
+            const cat = cats[Math.floor(Math.random()*cats.length)];
+            let words = [...DB[cat]];
+            const secret = words.splice(Math.floor(Math.random()*words.length), 1)[0];
+            const fake = words[Math.floor(Math.random()*words.length)];
+
+            let rolesDist = {};
+            let pool = [...players];
+            
+            for(let i=0; i<numImp; i++) {
+                let p = pool.splice(Math.floor(Math.random()*pool.length), 1)[0];
+                rolesDist[p] = { role: "IMPOSTOR", icon: "😈", word: "Cat: " + cat };
+            }
+            for(let i=0; i<numChar; i++) {
+                if(pool.length === 0) break;
+                let p = pool.splice(Math.floor(Math.random()*pool.length), 1)[0];
+                rolesDist[p] = { role: "CHARLATÁN", icon: "😇", word: fake };
+            }
+            pool.forEach(p => {
+                rolesDist[p] = { role: "CIUDADANO", icon: "😇", word: secret };
+            });
+
+            pubnub.publish({ channel: myChannel, message: { type: "assign_role", roles: rolesDist } });
+        }
+
+        function showRole(data) {
+            showScreen('role-screen');
+            document.getElementById('my-card').style.filter = 'blur(15px)';
+            document.getElementById('my-icon').innerText = data.icon;
+            document.getElementById('my-role').innerText = data.role;
+            document.getElementById('my-word').innerText = data.word;
+        }
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        if(urlParams.has('room')) {
+            document.getElementById('join-input').value = urlParams.get('room');
+            joinGame();
+        }
+    </script>
+</body>
+</html>
