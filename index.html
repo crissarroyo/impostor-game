@@ -7,31 +7,35 @@
     <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <style>
-        :root { --primary: #e74c3c; --accent: #f1c40f; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
-        body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; text-align: center; }
+        :root { --primary: #e74c3c; --accent: #f1c40f; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --font-size-base: 1.1rem; }
+        body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; text-align: center; font-size: var(--font-size-base); }
+        h1, h2, h3, p, label, button, input, select { font-size: var(--font-size-base); }
         .container { width: 95%; max-width: 420px; margin: auto; padding: 15px; box-sizing: border-box; }
         .setup-box { background: var(--card); padding: 15px; border-radius: 15px; border: 1px solid #334155; margin-bottom: 10px; text-align: left; }
-        .btn-main { background: var(--primary); color: white; border: none; padding: 16px; border-radius: 50px; width: 100%; font-weight: bold; cursor: pointer; font-size: 1.1rem; margin-top: 10px; }
+        .btn-main { background: var(--primary); color: white; border: none; padding: 16px; border-radius: 50px; width: 100%; font-weight: bold; cursor: pointer; margin-top: 10px; }
         .room-code { font-size: 2.2rem; color: var(--accent); letter-spacing: 5px; font-weight: bold; text-align: center; margin: 5px 0; }
         .screen { display: none; }
         .active { display: block; }
-        .input-dark { background: #0f172a; color: white; border: 1px solid #475569; padding: 10px; border-radius: 8px; width: 100%; box-sizing: border-box; margin-top: 5px; }
+        .input-dark { background: #0f172a; color: white; border: 1px solid #475569; padding: 10px; border-radius: 8px; width: 100%; box-sizing: border-box; margin-top: 5px; font-size: var(--font-size-base); }
         .card { width: 260px; height: 350px; background: #f8fafc; border-radius: 25px; margin: 20px auto; color: #1e293b; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 5px solid var(--primary); filter: blur(25px); transition: 0.3s; }
         .word { font-size: 2rem; color: #3b82f6; font-weight: 900; text-transform: uppercase; margin-top: 10px; border-bottom: 4px solid; }
         .timer { font-size: 3rem; font-weight: bold; color: var(--accent); margin: 10px 0; }
         /* Spinner */
         .spinner { display: none; margin: 20px auto; border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid var(--accent); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        ul.player-list { list-style: none; padding: 0; font-size: 0.9rem; opacity: 0.8; }
-        ul.player-list li { margin: 5px 0; }
+        ul.player-list { list-style: none; padding: 0; opacity: 0.8; }
+        ul.player-list li { margin: 5px 0; font-size: var(--font-size-base); }
         /* Versión Beta */
         .version { position: fixed; bottom: 10px; right: 10px; color: var(--text); opacity: 0.5; font-size: 0.8rem; z-index: 1000; }
         /* Voting */
-        .vote-btn { background: #3b82f6; color: white; border: none; padding: 8px; border-radius: 8px; margin-left: 10px; cursor: pointer; }
+        .vote-btn { background: #3b82f6; color: white; border: none; padding: 8px; border-radius: 8px; margin-left: 10px; cursor: pointer; font-size: var(--font-size-base); }
         .voted { background: #22c55e; }
         /* Results */
         .results-bar { background: #475569; height: 20px; margin: 5px 0; border-radius: 5px; }
         .results-fill { background: var(--accent); height: 100%; border-radius: 5px; }
+        /* Animación para input nombre */
+        @keyframes pulse { 0% { border-color: #475569; } 50% { border-color: var(--accent); } 100% { border-color: #475569; } }
+        .pulse-animation { animation: pulse 1.5s infinite; }
     </style>
 </head>
 <body>
@@ -43,7 +47,7 @@
                 <label>Tu Nombre: <input type="text" id="player-name" placeholder="Ej: Juan" class="input-dark" maxlength="15" required></label><br><br>
                 <button class="btn-main" onclick="startSession('host')">CREAR SALA NUEVA 🏠</button>
                 <div style="text-align: center; margin: 15px 0; opacity: 0.5;">— O —</div>
-                <input type="text" id="join-input" placeholder="CÓDIGO" maxlength="4" class="input-dark" style="text-align:center; font-size: 1.5rem; text-transform: uppercase;">
+                <input type="text" id="join-input" placeholder="CÓDIGO" maxlength="4" class="input-dark" style="text-align:center; text-transform: uppercase;">
                 <button class="btn-main" style="background:#3b82f6" onclick="startSession('join')">UNIRSE A SALA 📱</button>
             </div>
         </div>
@@ -111,6 +115,7 @@
             <h2>Modo Espectador 👀</h2>
             <p>Has sido expulsado, pero puedes seguir viendo el juego.</p>
             <div id="spectator-status"></div>
+            <ul id="spectator-vote-progress" class="player-list"></ul>
             <button class="btn-main" onclick="exitGame()" style="background:#475569">SALIR 🚪</button>
         </div>
 
@@ -123,7 +128,7 @@
     </div>
 
     <!-- Versión Beta -->
-    <div class="version">beta 0.8.4.3</div>
+    <div class="version">beta 0.8.4.4</div>
 
     <script>
         const DB = {
@@ -134,14 +139,15 @@
 
         let pubnub, channel, isHost = false, myId = localStorage.getItem('myId') || "P-" + Math.floor(Math.random() * 999999), playerName = localStorage.getItem('playerName') || "";
         let players = [], playersMap = {}, activePlayers = [], refreshInterval, myRole = {}, votes = {}, votedPlayers = new Set(), timerInterval;
-        let gamePhase = 'lobby'; // lobby, roles, round, voting, results
+        let gamePhase = 'lobby'; // lobby, roles, round, voting, results, game_over
         let impostors = [], charlatans = [], citizens = [], eliminated = [], roundTime = 60, isSpectator = false;
 
         // Chequear reconexión al load
         window.addEventListener('load', () => {
             const storedChannel = localStorage.getItem('channel');
-            if (storedChannel && playerName) {
-                if (confirm(`Reconectar a sala ${storedChannel}?`)) {
+            const storedPhase = localStorage.getItem('gamePhase') || 'lobby';
+            if (storedChannel && playerName && storedPhase !== 'game_over') {
+                if (confirm(`¿Desea reconectar a la sala ${storedChannel}?`)) {
                     channel = storedChannel;
                     startSession('reconnect');
                 }
@@ -151,7 +157,7 @@
         function startSession(mode) {
             if (mode !== 'reconnect') {
                 playerName = document.getElementById('player-name').value.trim();
-                if (!playerName) return alert("Ingresa tu nombre");
+                if (!playerName) return alert("Ingresa tu nombre.");
                 localStorage.setItem('playerName', playerName);
                 localStorage.setItem('myId', myId);
             }
@@ -162,7 +168,7 @@
                 code = Math.random().toString(36).substr(2, 4).toUpperCase();
             } else if (mode !== 'reconnect') {
                 code = document.getElementById('join-input').value.toUpperCase();
-                if (code.length !== 4) return alert("Código inválido");
+                if (code.length !== 4) return alert("Código inválido.");
             }
             channel = code;
             localStorage.setItem('channel', channel);
@@ -180,7 +186,7 @@
             pubnub.addListener({
                 status: (s) => {
                     if (s.category === "PNConnectedCategory") {
-                        console.log("Conectado a PubNub!");
+                        console.log("Conectado a PubNub.");
                         setPlayerState();
                         checkRoomSize();
                         updatePlayersList();
@@ -192,7 +198,7 @@
                         pubnub.reconnect();
                     } else if (s.error) {
                         console.error("Error PubNub:", s);
-                        alert("Error de conexión: " + s.operation + " - " + s.category);
+                        alert("Error de conexión: " + s.operation + " - " + s.category + ".");
                         document.getElementById('spinner').style.display = 'none';
                     }
                 },
@@ -203,11 +209,13 @@
                     } else if (msg.type === "start_round") {
                         startLocalTimer(msg.time);
                         gamePhase = 'round';
+                        localStorage.setItem('gamePhase', gamePhase);
                     } else if (msg.type === "vote") {
-                        if (isHost) {
+                        if (isHost || isSpectator) {
                             votes[msg.target] = (votes[msg.target] || 0) + 1;
                             votedPlayers.add(m.publisher);
-                            if (votedPlayers.size === activePlayers.length) publishResults();
+                            if (isSpectator) updateSpectatorVoteProgress();
+                            if (isHost && votedPlayers.size === activePlayers.length) publishResults();
                         }
                     } else if (msg.type === "results") {
                         showResults(msg.votes, msg.mostVoted, msg.eliminated);
@@ -244,7 +252,7 @@
             pubnub.setState({
                 state: { name: playerName },
                 channels: [channel]
-            }).then(() => console.log("Estado set: " + playerName));
+            }).then(() => console.log("Estado set: " + playerName + "."));
         }
 
         function checkRoomSize() {
@@ -254,7 +262,7 @@
                         const count = r.channels[channel].occupancy;
                         const max = parseInt(document.getElementById('max-players') ? document.getElementById('max-players').value : 10);
                         if (count > max) {
-                            alert("Sala llena! Máx: " + max);
+                            alert("Sala llena. Máximo: " + max + ".");
                             pubnub.unsubscribe({ channels: [channel] });
                             showScreen('home-screen');
                         }
@@ -289,12 +297,12 @@
         }
 
         function distributeRoles() {
-            if (players.length < 3) alert("Para testing ok, pero ideal ≥3 jugadores");
+            if (players.length < 3) alert("Para testing ok, pero ideal ≥3 jugadores.");
             const nImp = parseInt(document.getElementById('num-imp').value);
             const nChar = parseInt(document.getElementById('num-char').value);
             roundTime = parseInt(document.getElementById('round-time').value);
 
-            if (nImp + nChar > players.length) return alert("Impostores + Charlatanes no pueden exceder jugadores (" + players.length + ")");
+            if (nImp + nChar > players.length) return alert("Impostores + Charlatanes no pueden exceder jugadores (" + players.length + ").");
 
             const cats = Object.keys(DB);
             const cat = cats[Math.floor(Math.random() * cats.length)];
@@ -337,6 +345,7 @@
                 document.getElementById('my-word').innerText = data.word;
                 showScreen('role-screen');
                 gamePhase = 'roles';
+                localStorage.setItem('gamePhase', gamePhase);
                 if (isHost) document.getElementById('host-start-timer').style.display = 'block';
                 else document.getElementById('wait-host').style.display = 'block';
             }
@@ -368,10 +377,12 @@
             if (isSpectator) {
                 showScreen('spectator-screen');
                 document.getElementById('spectator-status').innerText = "Espera resultados de votación... 🗳️";
+                updateSpectatorVoteProgress();
                 return;
             }
             showScreen('voting-screen');
             gamePhase = 'voting';
+            localStorage.setItem('gamePhase', gamePhase);
             votes = {};
             votedPlayers = new Set();
             const voteList = document.getElementById('vote-list');
@@ -422,6 +433,7 @@
         function showResults(votesData, mostVoted, eliminatedId) {
             showScreen('results-screen');
             gamePhase = 'results';
+            localStorage.setItem('gamePhase', gamePhase);
             const resultsList = document.getElementById('results-list');
             resultsList.innerHTML = '';
             const maxVotes = Math.max(...Object.values(votesData), 1); // Evitar división por 0
@@ -460,6 +472,7 @@
                 document.getElementById('spectator-status').innerText = "Espera nueva ronda... ⏳";
             }
             gamePhase = 'roles';
+            localStorage.setItem('gamePhase', gamePhase);
         }
 
         function checkGameOver() {
@@ -472,6 +485,8 @@
             showScreen('game-over-screen');
             document.getElementById('game-result').innerText = `¡${winner} ganan! ${winner === 'Ciudadanos' ? '😇' : '😈'}`;
             if (isHost) document.getElementById('host-restart').style.display = 'block';
+            gamePhase = 'game_over';
+            localStorage.setItem('gamePhase', gamePhase);
         }
 
         function restartGame() {
@@ -514,6 +529,16 @@
             // Lógica para sync active players si needed
         }
 
+        function updateSpectatorVoteProgress() {
+            const progressList = document.getElementById('spectator-vote-progress');
+            progressList.innerHTML = '';
+            activePlayers.forEach(id => {
+                const li = document.createElement('li');
+                li.innerText = `${playersMap[id]}: ${votedPlayers.has(id) ? 'Votó ✅' : 'Pendiente ⏳'}`;
+                progressList.appendChild(li);
+            });
+        }
+
         function exitGame() {
             localStorage.clear();
             location.reload();
@@ -525,14 +550,12 @@
             clearInterval(refreshInterval);
         }
 
-        // Soporte para link
+        // Soporte para entrar directo por link
         const params = new URLSearchParams(window.location.search);
         if (params.has('room')) {
             document.getElementById('join-input').value = params.get('room');
-            if (!playerName) {
-                const name = prompt("Ingresa tu nombre:");
-                if (name) document.getElementById('player-name').value = name;
-            }
+            showScreen('home-screen');
+            document.getElementById('player-name').classList.add('pulse-animation');
             if (document.getElementById('player-name').value) {
                 startSession('join');
             }
