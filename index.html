@@ -141,7 +141,7 @@
                 <p>🕵️‍♂️ Bienvenido a El Impostor, un juego de deducción social multijugador.</p>
                 <p>1. Crea o únete a una sala usando el código o QR. 👥</p>
                 <p>2. El host configura número de impostores, charlatanes, tiempo y categorías. ⚙️</p>
-                <p>3. Roles: Ciudadanos 😇 conocen la palabra secreta, Impostores 😈 saben la categoría, Charlatanes 🤡 tienen una palabra similar pero falsa.</p>
+                <p>3. Roles: Ciudadanos 😇 conocen la palabra secreta, Impostores 😈 saben la categoría, Charlatanes 🤡 tienen una palabra falsa.</p>
                 <p>4. En rondas ⏱, da pistas relacionadas sin revelar la palabra. Discute con otros para identificar impostores.</p>
                 <p>5. Al final de cada ronda, vota 🗳️ por el sospechoso. Solo un voto por jugador.</p>
                 <p>6. El más votado es expulsado 🚫. Si es impostor, ¡punto para ciudadanos! Continúa hasta eliminar todos los impostores.</p>
@@ -153,7 +153,7 @@
     </div>
 
     <!-- Versión Beta -->
-    <div class="version">beta 0.8.4.7</div>
+    <div class="version">beta 0.8.4.8</div>
 
     <script>
         const DB = {
@@ -327,21 +327,19 @@
         }
 
         function checkRoomSize() {
-            if (!isHost) {
-                pubnub.hereNow({ channels: [channel], includeState: true }, (s, r) => {
-                    if (r && r.channels && r.channels[channel]) {
-                        const count = r.channels[channel].occupancy;
-                        const max = parseInt(document.getElementById('max-players').value || 10);
-                        if (count > max) {
-                            alert("Sala llena. Máximo: " + max + ".");
-                            pubnub.unsubscribe({ channels: [channel] });
-                            showScreen('home-screen');
-                        }
-                    } else {
-                        alert("Error verificando sala.");
+            pubnub.hereNow({ channels: [channel], includeState: true }, (s, r) => {
+                if (r && r.channels && r.channels[channel]) {
+                    const count = r.channels[channel].occupancy;
+                    const max = parseInt(document.getElementById('max-players').value || 10);
+                    if (count > max) {
+                        alert("Sala llena. Máximo: " + max + ".");
+                        pubnub.unsubscribe({ channels: [channel] });
+                        showScreen('home-screen');
                     }
-                });
-            }
+                } else {
+                    alert("Error verificando sala.");
+                }
+            });
         }
 
         function updatePlayersList() {
