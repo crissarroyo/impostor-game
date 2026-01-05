@@ -27,6 +27,7 @@
         <div id="home-screen" class="screen active">
             <h1>🕵️‍♂️ EL IMPOSTOR</h1>
             <div class="setup-box">
+                <label>Tu Nombre: <input type="text" id="player-name" placeholder="Ej: Juan" class="input-dark" maxlength="15" required></label><br><br>
                 <button class="btn-main" onclick="startSession('host')">CREAR SALA NUEVA 🏠</button>
                 <div style="text-align: center; margin: 15px 0; opacity: 0.5;">— O —</div>
                 <input type="text" id="join-input" placeholder="CÓDIGO" maxlength="4" class="input-dark" style="text-align:center; font-size: 1.5rem; text-transform: uppercase;">
@@ -45,6 +46,7 @@
 
             <div id="host-controls" style="display:none">
                 <div class="setup-box">
+                    <label>📏 Máx Jugadores: <input type="number" id="max-players" value="10" min="3" max="20" class="input-dark" style="width: 50px;"></label><br><br>
                     <label>😈 Impostores: <input type="number" id="num-imp" value="1" min="1" class="input-dark" style="width: 50px;"></label><br><br>
                     <label>🤡 Charlatanes: <input type="number" id="num-char" value="0" min="0" class="input-dark" style="width: 50px;"></label><br><br>
                     <label>⏱ Tiempo: 
@@ -79,10 +81,13 @@
             "Países 🌎": ["México", "Japón", "Brasil", "España", "Francia", "Italia", "Canadá", "Egipto"]
         };
 
-        let pubnub, channel, isHost = false, myId = "P-" + Math.floor(Math.random() * 9999);
-        let players = [];
+        let pubnub, channel, isHost = false, myId = "P-" + Math.floor(Math.random() * 999999), playerName = "";
+        let players = [], playersMap = {};
 
         function startSession(mode) {
+            playerName = document.getElementById('player-name').value.trim();
+            if (!playerName) return alert("Ingresa tu nombre");
+
             let code = "";
             if (mode === 'host') {
                 isHost = true;
@@ -99,12 +104,25 @@
             pubnub = new PubNub({
                 publishKey: 'pub-c-4638a1f8-084b-449e-b996-039c381f887f',
                 subscribeKey: 'sub-c-10902830-67c8-4721-91a9-d65e23616618',
-                userId: myId
+                userId: myId,
+                logVerbosity: true  // Para debug en console
             });
 
-            pubnub.subscribe({ channels: [channel], withPresence: true });
-
             pubnub.addListener({
+                status: (s) => {
+                    if (s.category === "PNConnectedCategory") {
+                        console.log("Conectado a PubNub!");
+                        setPlayerState();
+                        checkRoomSize();
+                    } else if (s.category === "PNNetworkDownCategory") {
+                        console.error("Red caída, reconectando...");
+                        alert("Conexión perdida. Reintentando...");
+                        pubnub.reconnect();
+                    } else if (s.error) {
+                        console.error("Error PubNub:", s);
+                        alert("Error de conexión: " + s.operation + " - " + s.category);
+                    }
+                },
                 message: (m) => {
                     const msg = m.message;
                     if (msg.type === "assign") {
@@ -119,27 +137,63 @@
                     if (msg.type === "start_timer") startLocalTimer(msg.time);
                 },
                 presence: (p) => {
-                    pubnub.hereNow({ channels: [channel] }, (s, r) => {
-                        players = r.channels[channel].occupants.map(o => o.uuid);
-                        document.getElementById('player-count').innerText = "Jugadores: " + players.length;
-                        document.getElementById('player-list').innerText = players.join(" • ");
-                    });
+                    if (p.action === "join" || p.action === "leave" || p.action === "state-change") {
+                        updatePlayersList();
+                    }
                 }
             });
 
+            pubnub.subscribe({ channels: [channel], withPresence: true });
             if (isHost) {
                 document.getElementById('host-controls').style.display = 'block';
                 const qr = qrcode(0, 'M');
-                qr.addData(window.location.href + "?room=" + channel);
+                const baseUrl = window.location.origin + window.location.pathname;
+                qr.addData(baseUrl + "?room=" + channel);
                 qr.make();
                 document.getElementById('qrcode').innerHTML = qr.createImgTag(5);
             }
         }
 
+        function setPlayerState() {
+            pubnub.setState({
+                state: { name: playerName },
+                channels: [channel]
+            }).then(() => console.log("Estado set: " + playerName));
+        }
+
+        function checkRoomSize() {
+            if (!isHost) {
+                pubnub.hereNow({ channels: [channel], includeState: true }, (s, r) => {
+                    const count = r.totalOccupancy;
+                    const max = parseInt(document.getElementById('max-players') ? document.getElementById('max-players').value : 10);  // Default 10
+                    if (count > max) {
+                        alert("Sala llena! Máx: " + max);
+                        pubnub.unsubscribe({ channels: [channel] });
+                        showScreen('home-screen');
+                    }
+                });
+            }
+        }
+
+        function updatePlayersList() {
+            pubnub.hereNow({ channels: [channel], includeState: true }, (s, r) => {
+                players = r.channels[channel].occupants.map(o => o.uuid);
+                playersMap = r.channels[channel].occupants.reduce((map, o) => {
+                    map[o.uuid] = o.state ? o.state.name : o.uuid;
+                    return map;
+                }, {});
+                document.getElementById('player-count').innerText = "Jugadores: " + players.length;
+                document.getElementById('player-list').innerText = Object.values(playersMap).join(" • ");
+            });
+        }
+
         function distributeRoles() {
             const nImp = parseInt(document.getElementById('num-imp').value);
             const nChar = parseInt(document.getElementById('num-char').value);
+            const maxPlayers = parseInt(document.getElementById('max-players').value);
             const time = parseInt(document.getElementById('round-time').value);
+
+            if (nImp + nChar > players.length) return alert("Impostores + Charlatanes no pueden exceder jugadores (" + players.length + ")");
 
             const cats = Object.keys(DB);
             const cat = cats[Math.floor(Math.random() * cats.length)];
@@ -196,6 +250,10 @@
         const params = new URLSearchParams(window.location.search);
         if (params.has('room')) {
             document.getElementById('join-input').value = params.get('room');
+            // Auto-join después de set name (asume name ya ingresado; si no, prompt)
+            if (document.getElementById('player-name').value) {
+                startSession('join');
+            }
         }
     </script>
 </body>
