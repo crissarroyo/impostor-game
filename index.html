@@ -3,22 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Impostor Pro Multi 🕵️‍♂️</title>
+    <title>Impostor Party 🕵️‍♂️</title>
     <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <style>
         :root { --primary: #e74c3c; --accent: #f1c40f; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; text-align: center; }
-        .container { width: 95%; max-width: 420px; margin: auto; padding: 15px; box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; text-align: center; touch-action: manipulation; }
+        .container { width: 95%; max-width: 420px; margin: auto; padding: 20px; box-sizing: border-box; }
         .setup-box { background: var(--card); padding: 20px; border-radius: 20px; border: 1px solid #334155; margin-bottom: 15px; }
-        .btn-main { background: var(--primary); color: white; border: none; padding: 16px; border-radius: 50px; width: 100%; font-weight: bold; cursor: pointer; font-size: 1.1rem; margin-top: 10px; }
-        .room-code { font-size: 2.2rem; color: var(--accent); letter-spacing: 5px; font-weight: bold; margin: 10px 0; border: 2px dashed #475569; padding: 10px; border-radius: 15px; }
+        .btn-main { background: var(--primary); color: white; border: none; padding: 18px; border-radius: 50px; width: 100%; font-weight: bold; cursor: pointer; font-size: 1.1rem; margin-top: 10px; -webkit-appearance: none; }
+        .room-code { font-size: 2.5rem; color: var(--accent); letter-spacing: 5px; font-weight: bold; margin: 10px 0; }
         #qrcode { background: white; padding: 10px; display: inline-block; border-radius: 10px; margin: 10px 0; }
         .screen { display: none; }
         .active { display: block; }
-        .card { width: 260px; height: 360px; background: #f8fafc; border-radius: 25px; margin: 20px auto; color: #1e293b; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 5px solid var(--primary); box-shadow: 0 10px 30px rgba(0,0,0,0.5); cursor: pointer; filter: blur(25px); transition: 0.3s; }
-        .word { font-size: 2rem; color: #3b82f6; font-weight: 900; text-transform: uppercase; margin-top: 10px; border-bottom: 4px solid; }
-        .status-msg { font-size: 0.9rem; margin: 10px 0; color: var(--accent); }
+        .card { width: 280px; height: 380px; background: #f8fafc; border-radius: 25px; margin: 20px auto; color: #1e293b; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 5px solid var(--primary); transition: 0.3s; box-shadow: 0 10px 20px rgba(0,0,0,0.4); }
+        .blur { filter: blur(25px); }
+        .word { font-size: 2.2rem; color: #3b82f6; font-weight: 900; text-transform: uppercase; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -27,32 +27,31 @@
         <div id="home-screen" class="screen active">
             <h1>🕵️‍♂️ EL IMPOSTOR</h1>
             <div class="setup-box">
-                <button class="btn-main" onclick="hostGame()">CREAR SALA NUEVA 🏠</button>
-                <div style="margin: 20px 0; opacity: 0.5;">— O —</div>
-                <input type="text" id="join-input" placeholder="CÓDIGO" maxlength="4" style="padding:15px; border-radius:10px; width:70%; text-align:center; font-size: 1.2rem; border: 1px solid #475569; background: #0f172a; color: white; text-transform: uppercase;">
-                <button class="btn-main" style="background:#3b82f6" onclick="joinGame()">UNIRSE A SALA 📱</button>
+                <button class="btn-main" onclick="startSession('host')">CREAR SALA 🏠</button>
+                <div style="margin: 20px 0; opacity: 0.4;">— O —</div>
+                <input type="text" id="join-input" placeholder="CÓDIGO" maxlength="4" style="padding:15px; border-radius:10px; width:70%; text-align:center; font-size: 1.5rem; border: none; outline: none; background: #334155; color: white; text-transform: uppercase;">
+                <button class="btn-main" style="background:#3b82f6" onclick="startSession('join')">UNIRSE 📱</button>
             </div>
         </div>
 
         <div id="lobby-screen" class="screen">
-            <h2 id="lobby-title">Conectando...</h2>
+            <h2 id="lobby-title">Sala de Espera</h2>
             <div class="setup-box">
                 <div class="room-code" id="display-code">----</div>
                 <div id="qrcode"></div>
-                <p id="player-count" style="font-size: 1.2rem; font-weight: bold;">Jugadores: 1</p>
-                <div id="player-list" style="font-size: 0.8rem; opacity: 0.7;"></div>
+                <p id="player-count" style="font-size: 1.2rem;">Jugadores: 1</p>
+                <div id="player-list" style="opacity: 0.6; font-size: 0.9rem;"></div>
             </div>
             <div id="host-controls" style="display:none">
-                <button class="btn-main" onclick="distributeRoles()">¡REPARTIR ROLES! 📦</button>
+                <button class="btn-main" onclick="sendRoles()">¡REPARTIR ROLES! 📦</button>
             </div>
-            <p id="error-msg" style="color: #e74c3c; font-size: 0.8rem;"></p>
         </div>
 
         <div id="role-screen" class="screen">
-            <h3 id="role-status-msg">Toca la carta:</h3>
-            <div class="card" id="my-card" onclick="toggleCard()">
+            <h3>Toca para ver:</h3>
+            <div class="card blur" id="my-card" onclick="this.classList.toggle('blur')">
                 <div id="my-icon" style="font-size:80px">❓</div>
-                <h2 id="my-role">SECRET</h2>
+                <h2 id="my-role">ROL</h2>
                 <div id="my-word" class="word"></div>
             </div>
             <button class="btn-main" onclick="location.reload()" style="background:#475569">SALIR</button>
@@ -61,131 +60,89 @@
 
     <script>
         const DB = {
-            "Países 🌎": ["México", "España", "Brasil", "Japón", "Francia", "Italia", "Canadá", "Alemania"],
-            "Animales 🦁": ["León", "Tigre", "Elefante", "Lobo", "Delfín", "Águila", "Gorila", "Zorro"],
-            "Comida 🍕": ["Pizza", "Tacos", "Sushi", "Hamburguesa", "Pasta", "Pastel", "Ensalada"]
+            "Animales 🦁": ["León", "Elefante", "Perro", "Gato", "Delfín", "Águila", "Tigre"],
+            "Comida 🍕": ["Pizza", "Sushi", "Taco", "Pasta", "Hamburguesa", "Ensalada"],
+            "Países 🌎": ["México", "Japón", "Italia", "Brasil", "España", "Francia"]
         };
 
-        let pubnub, myChannel, isHost = false;
-        let myId = "Jugador_" + Math.floor(Math.random() * 999);
-        let players = [];
+        let pubnub, channel, isHost = false;
+        const myId = "P-" + Math.floor(Math.random() * 999);
 
-        function connect(channel) {
-            myChannel = channel;
+        function startSession(mode) {
+            let code = "";
+            if (mode === 'host') {
+                isHost = true;
+                code = Math.random().toString(36).substr(2, 4).toUpperCase();
+                document.getElementById('host-controls').style.display = 'block';
+            } else {
+                code = document.getElementById('join-input').value.toUpperCase();
+                if (code.length !== 4) return alert("Escribe el código de 4 letras");
+            }
+
+            channel = code;
+            document.getElementById('display-code').innerText = channel;
+            showScreen('lobby-screen');
+
+            // Inicializar PubNub
             pubnub = new PubNub({
                 publishKey: 'pub-c-4638a1f8-084b-449e-b996-039c381f887f',
                 subscribeKey: 'sub-c-10902830-67c8-4721-91a9-d65e23616618',
                 userId: myId
             });
 
-            // Suscribirse con Presence para detectar gente automáticamente
-            pubnub.subscribe({ 
-                channels: [myChannel],
-                withPresence: true 
-            });
+            pubnub.subscribe({ channels: [channel], withPresence: true });
 
             pubnub.addListener({
-                status: (s) => {
-                    if (s.category === "PNConnectedCategory") {
-                        if (!isHost) {
-                            // Si soy jugador, aviso al host que llegué
-                            pubnub.publish({ channel: myChannel, message: { type: "hello", user: myId } });
+                message: (m) => {
+                    const msg = m.message;
+                    if (msg.type === "roles") {
+                        const myData = msg.data[myId];
+                        if (myData) {
+                            document.getElementById('my-icon').innerText = myData.icon;
+                            document.getElementById('my-role').innerText = myData.role;
+                            document.getElementById('my-word').innerText = myData.word;
+                            showScreen('role-screen');
                         }
                     }
                 },
                 presence: (p) => {
-                    if (isHost) {
-                        pubnub.hereNow({ channels: [myChannel] }, (status, response) => {
-                            players = response.channels[myChannel].occupants.map(o => o.uuid);
-                            updateUI();
-                            // El host manda la lista a todos
-                            pubnub.publish({ channel: myChannel, message: { type: "sync", list: players } });
-                        });
-                    }
-                },
-                message: (m) => {
-                    const data = m.message;
-                    if (data.type === "sync") {
-                        players = data.list;
-                        updateUI();
-                    }
-                    if (data.type === "assign") {
-                        showRole(data.roles[myId]);
-                    }
+                    pubnub.hereNow({ channels: [channel] }, (s, r) => {
+                        const occupants = r.channels[channel].occupants;
+                        const ids = occupants.map(o => o.uuid);
+                        document.getElementById('player-count').innerText = "Jugadores: " + occupants.length;
+                        document.getElementById('player-list').innerText = ids.join(" • ");
+                    });
                 }
             });
+
+            // Generar QR para el host
+            if (isHost) {
+                const qr = qrcode(0, 'M');
+                qr.addData(window.location.origin + window.location.pathname + '?room=' + channel);
+                qr.make();
+                document.getElementById('qrcode').innerHTML = qr.createImgTag(5);
+            }
         }
 
-        function hostGame() {
-            isHost = true;
-            const code = Math.random().toString(36).substr(2, 4).toUpperCase();
-            document.getElementById('display-code').innerText = code;
-            document.getElementById('host-controls').style.display = 'block';
-            document.getElementById('lobby-title').innerText = "Sala de Anfitrión";
-            
-            const qr = qrcode(0, 'M');
-            qr.addData(window.location.origin + window.location.pathname + '?room=' + code);
-            qr.make();
-            document.getElementById('qrcode').innerHTML = qr.createImgTag(5);
-            
-            showScreen('lobby-screen');
-            connect(code);
-        }
+        function sendRoles() {
+            pubnub.hereNow({ channels: [channel] }, (s, r) => {
+                const players = r.channels[channel].occupants.map(o => o.uuid);
+                if (players.length < 2) return alert("Faltan jugadores");
 
-        function joinGame() {
-            const code = document.getElementById('join-input').value.toUpperCase();
-            if (code.length !== 4) return alert("Código de 4 letras");
-            
-            document.getElementById('display-code').innerText = code;
-            document.getElementById('lobby-title').innerText = "Buscando Sala...";
-            showScreen('lobby-screen');
-            connect(code);
+                const cats = Object.keys(DB);
+                const cat = cats[Math.floor(Math.random() * cats.length)];
+                const word = DB[cat][Math.floor(Math.random() * DB[cat].length)];
 
-            // Timeout para error si no hay nadie
-            setTimeout(() => {
-                if (players.length <= 1) {
-                    document.getElementById('error-msg').innerText = "No se encontró al anfitrión. Verifica el código.";
-                }
-            }, 5000);
-        }
+                let roles = {};
+                const impIdx = Math.floor(Math.random() * players.length);
+                
+                players.forEach((id, i) => {
+                    if (i === impIdx) roles[id] = { role: "IMPOSTOR", icon: "😈", word: "Cat: " + cat };
+                    else roles[id] = { role: "CIUDADANO", icon: "😇", word: word };
+                });
 
-        function updateUI() {
-            document.getElementById('player-count').innerText = `Jugadores: ${players.length}`;
-            document.getElementById('player-list').innerText = players.join(" • ");
-            if (players.length > 1) document.getElementById('lobby-title').innerText = "¡Conectado! ✅";
-        }
-
-        function distributeRoles() {
-            const cats = Object.keys(DB);
-            const cat = cats[Math.floor(Math.random()*cats.length)];
-            const secret = DB[cat][Math.floor(Math.random()*DB[cat].length)];
-
-            let rolesDist = {};
-            let pool = [...players];
-            
-            // Un impostor al azar
-            let impIdx = Math.floor(Math.random() * pool.length);
-            let impId = pool.splice(impIdx, 1)[0];
-            
-            rolesDist[impId] = { role: "IMPOSTOR", icon: "😈", word: "Cat: " + cat };
-            pool.forEach(p => {
-                rolesDist[p] = { role: "CIUDADANO", icon: "😇", word: secret };
+                pubnub.publish({ channel: channel, message: { type: "roles", data: roles } });
             });
-
-            pubnub.publish({ channel: myChannel, message: { type: "assign", roles: rolesDist } });
-        }
-
-        function showRole(data) {
-            if (!data) return;
-            showScreen('role-screen');
-            document.getElementById('my-icon').innerText = data.icon;
-            document.getElementById('my-role').innerText = data.role;
-            document.getElementById('my-word').innerText = data.word;
-        }
-
-        function toggleCard() {
-            const card = document.getElementById('my-card');
-            card.style.filter = (card.style.filter.includes('blur')) ? 'none' : 'blur(25px)';
         }
 
         function showScreen(id) {
@@ -193,11 +150,13 @@
             document.getElementById(id).classList.add('active');
         }
 
-        // Auto-join
-        const params = new URLSearchParams(window.location.search);
-        if (params.has('room')) {
-            document.getElementById('join-input').value = params.get('room');
-            setTimeout(joinGame, 1000);
+        // Auto-join si hay parámetro en URL
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('room')) {
+            document.getElementById('join-input').value = urlParams.get('room');
+            // Esperar un toque del usuario para iniciar por reglas de Safari
+            document.body.onclick = () => { startSession('join'); document.body.onclick = null; };
+            alert("Toca la pantalla para entrar a la sala");
         }
     </script>
 </body>
