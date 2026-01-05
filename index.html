@@ -36,6 +36,9 @@
         /* Animación para input nombre */
         @keyframes pulse { 0% { border-color: #475569; } 50% { border-color: var(--accent); } 100% { border-color: #475569; } }
         .pulse-animation { animation: pulse 1.5s infinite; }
+        /* Categories */
+        .categories-list { max-height: 200px; overflow-y: auto; }
+        .categories-list label { display: block; }
     </style>
 </head>
 <body>
@@ -45,6 +48,22 @@
             <h1>🕵️‍♂️ EL IMPOSTOR</h1>
             <div class="setup-box">
                 <label>Tu Nombre: <input type="text" id="player-name" placeholder="Ej: Juan" class="input-dark" maxlength="15" required></label><br><br>
+                <div id="host-config">
+                    <div class="setup-box">
+                        <label>📏 Máx Jugadores: <input type="number" id="max-players" value="10" min="3" max="20" class="input-dark" style="width: 50px;"></label><br><br>
+                        <label>😈 Impostores: <input type="number" id="num-imp" value="1" min="1" class="input-dark" style="width: 50px;"></label><br><br>
+                        <label>🤡 Charlatanes: <input type="number" id="num-char" value="0" min="0" class="input-dark" style="width: 50px;"></label><br><br>
+                        <label>⏱ Tiempo por Ronda: 
+                            <select id="round-time" class="input-dark" style="width: 100px;">
+                                <option value="30">30 seg</option>
+                                <option value="60">1 min</option>
+                                <option value="120">2 min</option>
+                            </select>
+                        </label><br><br>
+                        <label>Categorías: <button onclick="toggleAllCategories(true)">Seleccionar Todas</button> <button onclick="toggleAllCategories(false)">Deseleccionar Todas</button></label>
+                        <div class="categories-list" id="categories-list"></div>
+                    </div>
+                </div>
                 <button class="btn-main" onclick="startSession('host')">CREAR SALA NUEVA 🏠</button>
                 <div style="text-align: center; margin: 15px 0; opacity: 0.5;">— O —</div>
                 <input type="text" id="join-input" placeholder="CÓDIGO" maxlength="4" class="input-dark" style="text-align:center; text-transform: uppercase;">
@@ -61,22 +80,7 @@
                 <p id="player-count" style="font-weight: bold;">Jugadores conectados: 0 👥</p>
                 <ul id="player-list" class="player-list"></ul>
             </div>
-
-            <div id="host-controls" style="display:none">
-                <div class="setup-box">
-                    <label>📏 Máx Jugadores: <input type="number" id="max-players" value="10" min="3" max="20" class="input-dark" style="width: 50px;"></label><br><br>
-                    <label>😈 Impostores: <input type="number" id="num-imp" value="1" min="1" class="input-dark" style="width: 50px;"></label><br><br>
-                    <label>🤡 Charlatanes: <input type="number" id="num-char" value="0" min="0" class="input-dark" style="width: 50px;"></label><br><br>
-                    <label>⏱ Tiempo por Ronda: 
-                        <select id="round-time" class="input-dark" style="width: 100px;">
-                            <option value="30">30 seg</option>
-                            <option value="60">1 min</option>
-                            <option value="120">2 min</option>
-                        </select>
-                    </label>
-                </div>
-                <button class="btn-main" onclick="distributeRoles()">¡REPARTIR ROLES! 📦</button>
-            </div>
+            <button class="btn-main" onclick="distributeRoles()">¡REPARTIR ROLES! 📦</button>
         </div>
 
         <div id="role-screen" class="screen">
@@ -125,25 +129,79 @@
             <button class="btn-main" onclick="exitGame()" style="background:#475569">SALIR 🚪</button>
             <div id="host-restart" style="display:none"><button class="btn-main" style="background:#22c55e" onclick="restartGame()">REINICIAR SALA 🔄</button></div>
         </div>
+
+        <div id="instructions-screen" class="screen">
+            <h2>Instrucciones del Juego 📜</h2>
+            <div class="setup-box">
+                <p>1. Crea o únete a una sala.</p>
+                <p>2. El host configura y reparte roles: Ciudadanos saben la palabra secreta, Impostores saben la categoría, Charlatanes tienen una palabra falsa.</p>
+                <p>3. En cada ronda, da pistas relacionadas con la palabra (sin decirla).</p>
+                <p>4. Al final de la ronda, vota por el sospechoso de ser impostor.</p>
+                <p>5. El más votado es expulsado. Si es impostor, ciudadanos ganan. Si no, continúa hasta encontrar todos los impostores.</p>
+                <p>6. Espectadores ven el progreso sin participar.</p>
+            </div>
+            <button class="btn-main" onclick="showScreen('home-screen')">VOLVER</button>
+        </div>
     </div>
 
+    <button style="position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%); background: #475569; color: white; border: none; padding: 10px; border-radius: 20px; cursor: pointer;" onclick="showScreen('instructions-screen')">Instrucciones 📜</button>
+
     <!-- Versión Beta -->
-    <div class="version">beta 0.8.4.4</div>
+    <div class="version">beta 0.8.4.5</div>
 
     <script>
         const DB = {
-            "Animales 🦁": ["León", "Tigre", "Elefante", "Cebra", "Delfín", "Lobo", "Gorila", "Águila"],
-            "Comida 🍕": ["Pizza", "Tacos", "Sushi", "Hamburguesa", "Pasta", "Ensalada", "Pastel"],
-            "Países 🌎": ["México", "Japón", "Brasil", "España", "Francia", "Italia", "Canadá", "Egipto"]
+            "Animales 🦁": ["León", "Tigre", "Elefante", "Cebra", "Delfín", "Lobo", "Gorila", "Águila", "Jirafa", "Hipopótamo", "Rinoceronte", "Cocodrilo", "Serpiente", "Mono", "Pájaro", "Pez", "Tortuga", "Conejo", "Gato", "Perro", "Caballo", "Vaca", "Oveja", "Cerdo", "Gallina", "Pato", "Oso", "Zorro"],
+            "Comida 🍕": ["Pizza", "Tacos", "Sushi", "Hamburguesa", "Pasta", "Ensalada", "Pastel", "Helado", "Sopa", "Arroz", "Frijoles", "Pollo", "Carne", "Pescado", "Pan", "Queso", "Yogur", "Fruta", "Verdura", "Chocolate", "Galletas", "Café", "Té", "Jugo", "Agua", "Cereal", "Tortilla", "Empanada"],
+            "Países 🌎": ["México", "Japón", "Brasil", "España", "Francia", "Italia", "Canadá", "Egipto", "China", "India", "Estados Unidos", "Alemania", "Reino Unido", "Australia", "Rusia", "Argentina", "Chile", "Perú", "Colombia", "Venezuela", "Cuba", "Portugal", "Grecia", "Turquía", "Sudáfrica", "Nigeria", "Kenia", "Noruega"],
+            "Profesiones 👨‍⚕️": ["Médico", "Enfermero", "Abogado", "Ingeniero", "Profesor", "Policía", "Bombero", "Chef", "Actor", "Cantante", "Pintor", "Escritor", "Piloto", "Arquitecto", "Dentista", "Veterinario", "Electricista", "Plomero", "Mecánico", "Periodista", "Fotógrafo", "Diseñador", "Programador", "Contador", "Gerente", "Vendedor", "Agricultor", "Pescador"],
+            "Deportes ⚽": ["Fútbol", "Baloncesto", "Tenis", "Natación", "Atletismo", "Boxeo", "Ciclismo", "Golf", "Voleibol", "Béisbol", "Rugby", "Esquí", "Surf", "Karate", "Judo", "Gimnasia", "Hockey", "Críquet", "Automovilismo", "Motociclismo", "Equitación", "Escalada", "Patinaje", "Bádminton", "Ping Pong", "Arquería", "Lucha", "Taekwondo"],
+            "Ciudades 🏙️": ["Ciudad de México", "Tokio", "Río de Janeiro", "Madrid", "París", "Roma", "Toronto", "El Cairo", "Beijing", "Nueva Delhi", "Nueva York", "Berlín", "Londres", "Sídney", "Moscú", "Buenos Aires", "Santiago", "Lima", "Bogotá", "Caracas", "La Habana", "Lisboa", "Atenas", "Estambul", "Ciudad del Cabo", "Lagos", "Nairobi", "Oslo"],
+            "Frutas 🍎": ["Manzana", "Banana", "Naranja", "Uva", "Fresa", "Piña", "Mango", "Sandía", "Melón", "Kiwi", "Pera", "Cereza", "Limón", "Lima", "Durazno", "Ciruela", "Granada", "Papaya", "Coco", "Higo", "Dátil", "Mandarina", "Toronja", "Guayaba", "Maracuyá", "Lichi", "Pitaya", "Carambola"],
+            "Vehículos 🚗": ["Coche", "Bicicleta", "Motocicleta", "Avión", "Barco", "Tren", "Autobús", "Camión", "Helicóptero", "Submarino", "Tractor", "Patineta", "Scooter", "Caravana", "Lancha", "Yate", "Balsa", "Globo", "Cohete", "Tranvía", "Metro", "Trolebús", "Carreta", "Carruaje", "Monopatín", "Segway", "Quad", "Kart"],
+            "Colores 🌈": ["Rojo", "Azul", "Verde", "Amarillo", "Naranja", "Morado", "Rosa", "Negro", "Blanco", "Gris", "Marrón", "Celeste", "Turquesa", "Magenta", "Violeta", "Índigo", "Beige", "Dorado", "Plateado", "Cian", "Fucsia", "Ocre", "Siena", "Oliva", "Coral", "Lavanda", "Aqua", "Lila"],
+            "Instrumentos 🎸": ["Guitarra", "Piano", "Batería", "Violín", "Flauta", "Trompeta", "Saxofón", "Arpa", "Bajo", "Cello", "Armónica", "Acordeón", "Trombón", "Clarinete", "Órgano", "Ukelele", "Banjo", "Mandolina", "Xilófono", "Maracas", "Tambor", "Gaita", "Didgeridoo", "Sitar", "Theremin", "Kalimba", "Cencerro", "Triángulo"],
+            "Películas 🎥": ["Titanic", "Star Wars", "El Padrino", "Jurassic Park", "Harry Potter", "El Señor de los Anillos", "Matrix", "Inception", "Forrest Gump", "Pulp Fiction", "Avatar", "Frozen", "Toy Story", "Shrek", "Batman", "Superman", "Spider-Man", "Iron Man", "Avengers", "Joker", "Parasite", "La La Land", "Coco", "Up", "Finding Nemo", "The Lion King", "Aladdin", "Beauty and the Beast"],
+            "Libros 📖": ["Harry Potter", "El Señor de los Anillos", "Cien Años de Soledad", "1984", "El Gran Gatsby", "Moby Dick", "Orgullo y Prejuicio", "Don Quijote", "La Odisea", "La Ilíada", "Crimen y Castigo", "Guerra y Paz", "El Principito", "Alicia en el País de las Maravillas", "Sherlock Holmes", "Dracula", "Frankenstein", "El Código Da Vinci", "Juego de Tronos", "El Alquimista", "Los Juegos del Hambre", "Crepúsculo", "Percy Jackson", "Narnia", "Dune", "Fahrenheit 451", "Brave New World", "To Kill a Mockingbird"],
+            "Marcas 🛍️": ["Nike", "Apple", "Coca-Cola", "Google", "Microsoft", "Samsung", "Toyota", "Mercedes", "BMW", "Adidas", "Puma", "Louis Vuitton", "Gucci", "Chanel", "Rolex", "Sony", "LG", "Pepsi", "McDonald's", "Burger King", "Starbucks", "Amazon", "eBay", "Netflix", "Disney", "Pixar", "Marvel", "DC"],
+            "Elementos Químicos ⚗️": ["Hidrógeno", "Helio", "Litio", "Berilio", "Boro", "Carbono", "Nitrógeno", "Oxígeno", "Flúor", "Neón", "Sodio", "Magnesio", "Aluminio", "Silicio", "Fósforo", "Azufre", "Cloro", "Argón", "Potasio", "Calcio", "Escandio", "Titanio", "Vanadio", "Cromo", "Manganeso", "Hierro", "Cobalto", "Níquel"],
+            "Planetas 🪐": ["Mercurio", "Venus", "Tierra", "Marte", "Júpiter", "Saturno", "Urano", "Neptuno", "Plutón", "Ceres", "Eris", "Makemake", "Haumea", "Europa", "Ganimedes", "Calisto", "Io", "Titán", "Encélado", "Tritón", "Luna", "Fobos", "Deimos", "Caronte", "Oberon", "Titania", "Ariel", "Miranda"]
         };
 
         let pubnub, channel, isHost = false, myId = localStorage.getItem('myId') || "P-" + Math.floor(Math.random() * 999999), playerName = localStorage.getItem('playerName') || "";
         let players = [], playersMap = {}, activePlayers = [], refreshInterval, myRole = {}, votes = {}, votedPlayers = new Set(), timerInterval;
         let gamePhase = 'lobby'; // lobby, roles, round, voting, results, game_over
         let impostors = [], charlatans = [], citizens = [], eliminated = [], roundTime = 60, isSpectator = false;
+        let selectedCategories = Object.keys(DB);
+
+        function initCategories() {
+            const list = document.getElementById('categories-list');
+            list.innerHTML = '';
+            Object.keys(DB).forEach(cat => {
+                const label = document.createElement('label');
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = true;
+                checkbox.value = cat;
+                checkbox.onchange = updateSelectedCategories;
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(cat));
+                list.appendChild(label);
+            });
+        }
+
+        function toggleAllCategories(select) {
+            document.querySelectorAll('#categories-list input[type="checkbox"]').forEach(cb => cb.checked = select);
+            updateSelectedCategories();
+        }
+
+        function updateSelectedCategories() {
+            selectedCategories = Array.from(document.querySelectorAll('#categories-list input[type="checkbox"]:checked')).map(cb => cb.value);
+        }
 
         // Chequear reconexión al load
         window.addEventListener('load', () => {
+            initCategories();
             const storedChannel = localStorage.getItem('channel');
             const storedPhase = localStorage.getItem('gamePhase') || 'lobby';
             if (storedChannel && playerName && storedPhase !== 'game_over') {
@@ -155,12 +213,10 @@
         });
 
         function startSession(mode) {
-            if (mode !== 'reconnect') {
-                playerName = document.getElementById('player-name').value.trim();
-                if (!playerName) return alert("Ingresa tu nombre.");
-                localStorage.setItem('playerName', playerName);
-                localStorage.setItem('myId', myId);
-            }
+            playerName = document.getElementById('player-name').value.trim();
+            if (!playerName) return alert("Ingresa tu nombre.");
+            localStorage.setItem('playerName', playerName);
+            localStorage.setItem('myId', myId);
 
             let code = channel || "";
             if (mode === 'host') {
@@ -227,6 +283,10 @@
                         location.reload();
                     } else if (msg.type === "sync") {
                         handleSync(msg);
+                    } else if (msg.type === "phase_update") {
+                        if (isSpectator) {
+                            document.getElementById('spectator-status').innerText = msg.status;
+                        }
                     }
                 },
                 presence: (p) => {
@@ -239,7 +299,6 @@
             pubnub.subscribe({ channels: [channel], withPresence: true });
 
             if (isHost && mode !== 'reconnect') {
-                document.getElementById('host-controls').style.display = 'block';
                 const qr = qrcode(0, 'M');
                 const baseUrl = window.location.origin + window.location.pathname;
                 qr.addData(baseUrl + "?room=" + channel);
@@ -260,7 +319,7 @@
                 pubnub.hereNow({ channels: [channel], includeState: true }, (s, r) => {
                     if (r && r.channels && r.channels[channel]) {
                         const count = r.channels[channel].occupancy;
-                        const max = parseInt(document.getElementById('max-players') ? document.getElementById('max-players').value : 10);
+                        const max = parseInt(document.getElementById('max-players').value || 10);
                         if (count > max) {
                             alert("Sala llena. Máximo: " + max + ".");
                             pubnub.unsubscribe({ channels: [channel] });
@@ -304,8 +363,9 @@
 
             if (nImp + nChar > players.length) return alert("Impostores + Charlatanes no pueden exceder jugadores (" + players.length + ").");
 
-            const cats = Object.keys(DB);
-            const cat = cats[Math.floor(Math.random() * cats.length)];
+            if (selectedCategories.length === 0) return alert("Selecciona al menos una categoría.");
+
+            const cat = selectedCategories[Math.floor(Math.random() * selectedCategories.length)];
             const words = [...DB[cat]];
             const secret = words.splice(Math.floor(Math.random() * words.length), 1)[0];
             const fake = words[Math.floor(Math.random() * words.length)];
@@ -318,7 +378,7 @@
 
             for(let i=0; i<nImp && pool.length; i++) {
                 let id = pool.splice(Math.floor(Math.random()*pool.length), 1)[0];
-                roles[id] = { role: "IMPOSTOR", icon: "😈", word: "Cat: " + cat };
+                roles[id] = { role: "IMPOSTOR", icon: "😈", word: "Categoría: " + cat };
                 impostors.push(id);
             }
             for(let i=0; i<nChar && pool.length; i++) {
@@ -354,6 +414,7 @@
         function startRound() {
             pubnub.publish({ channel: channel, message: { type: "start_round", time: roundTime } });
             document.getElementById('host-start-timer').style.display = 'none';
+            if (isHost) pubnub.publish({ channel: channel, message: { type: "phase_update", status: "Ronda en progreso... ⏳" } });
         }
 
         function startLocalTimer(duration) {
@@ -376,8 +437,9 @@
         function startVoting() {
             if (isSpectator) {
                 showScreen('spectator-screen');
-                document.getElementById('spectator-status').innerText = "Espera resultados de votación... 🗳️";
+                document.getElementById('spectator-status').innerText = "Votación en progreso... 🗳️";
                 updateSpectatorVoteProgress();
+                if (isHost) pubnub.publish({ channel: channel, message: { type: "phase_update", status: "Votación en progreso... 🗳️" } });
                 return;
             }
             showScreen('voting-screen');
@@ -399,6 +461,7 @@
                 voteList.appendChild(li);
             });
             setTimeout(() => { if (isHost && votedPlayers.size < activePlayers.length) publishResults(); }, 30000);
+            if (isHost) pubnub.publish({ channel: channel, message: { type: "phase_update", status: "Votación en progreso... 🗳️" } });
         }
 
         function sendVote(target, btn) {
@@ -456,6 +519,7 @@
                 document.getElementById('spectator-status').innerText = `Has sido expulsado ${impostors.includes(myId) ? '😈' : '😇'}. Observa el juego.`;
             }
             if (isHost && impostors.length > 0) document.getElementById('host-next-round').style.display = 'block';
+            if (isHost) pubnub.publish({ channel: channel, message: { type: "phase_update", status: "Resultados mostrados 📊" } });
         }
 
         function nextRound() {
@@ -473,6 +537,7 @@
             }
             gamePhase = 'roles';
             localStorage.setItem('gamePhase', gamePhase);
+            if (isHost) pubnub.publish({ channel: channel, message: { type: "phase_update", status: "Espera nueva ronda... ⏳" } });
         }
 
         function checkGameOver() {
@@ -555,8 +620,9 @@
         if (params.has('room')) {
             document.getElementById('join-input').value = params.get('room');
             showScreen('home-screen');
-            document.getElementById('player-name').classList.add('pulse-animation');
-            if (document.getElementById('player-name').value) {
+            if (!document.getElementById('player-name').value) {
+                document.getElementById('player-name').classList.add('pulse-animation');
+            } else {
                 startSession('join');
             }
         }
