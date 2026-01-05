@@ -3,23 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Impostor Pro Multi 🕵️‍♂️</title>
+    <title>Impostor Final Pro 🕵️‍♂️</title>
     <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <style>
         :root { --primary: #e74c3c; --accent: #f1c40f; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --citizen: #3b82f6; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; text-align: center; }
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; text-align: center; -webkit-tap-highlight-color: transparent; }
         .container { width: 95%; max-width: 420px; margin: auto; padding: 15px; box-sizing: border-box; }
         .setup-box { background: var(--card); padding: 15px; border-radius: 20px; border: 1px solid #334155; margin-bottom: 15px; }
-        .btn-main { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 50px; width: 100%; font-weight: bold; cursor: pointer; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(0,0,0,0.3); margin-top: 10px; }
-        .btn-main:disabled { opacity: 0.4; }
-        .room-code { font-size: 2.2rem; color: var(--accent); letter-spacing: 5px; font-weight: bold; margin: 10px 0; }
+        .btn-main { background: var(--primary); color: white; border: none; padding: 16px; border-radius: 50px; width: 100%; font-weight: bold; cursor: pointer; font-size: 1.1rem; margin-top: 10px; transition: 0.2s; }
+        .btn-main:active { transform: scale(0.98); background: #c0392b; }
+        .room-code { font-size: 2.2rem; color: var(--accent); letter-spacing: 5px; font-weight: bold; margin: 10px 0; border: 2px dashed #475569; border-radius: 15px; padding: 10px; }
         #qrcode { background: white; padding: 10px; display: inline-block; border-radius: 10px; margin: 10px 0; }
-        .screen { display: none; }
+        .screen { display: none; animation: fadeIn 0.3s ease-in; }
         .active { display: block; }
-        .card { width: 280px; height: 380px; background: #f8fafc; border-radius: 25px; margin: 20px auto; color: #1e293b; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 5px solid var(--primary); filter: blur(15px); transition: 0.3s; cursor: pointer; }
-        .role-icon { font-size: 80px; }
-        .word { font-size: 2rem; color: var(--citizen); font-weight: bold; margin-top: 10px; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .card { width: 280px; height: 380px; background: #f8fafc; border-radius: 25px; margin: 20px auto; color: #1e293b; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 5px solid var(--primary); box-shadow: 0 10px 30px rgba(0,0,0,0.5); cursor: pointer; }
+        .role-icon { font-size: 80px; margin-bottom: 10px; }
+        .word { font-size: 2.2rem; color: var(--citizen); font-weight: 900; text-transform: uppercase; border-bottom: 4px solid; padding: 0 10px; }
     </style>
 </head>
 <body>
@@ -28,55 +29,54 @@
         <div id="home-screen" class="screen active">
             <h1>🕵️‍♂️ EL IMPOSTOR</h1>
             <div class="setup-box">
-                <button class="btn-main" onclick="hostGame()">CREAR NUEVA SALA 🏠</button>
+                <button class="btn-main" onclick="hostGame()">CREAR SALA NUEVA 🏠</button>
                 <div style="margin: 20px 0; opacity: 0.5;">— O —</div>
-                <input type="text" id="join-input" placeholder="CÓDIGO" style="padding:12px; border-radius:10px; width:60%; text-align:center; font-size: 1.2rem; border: 1px solid #475569; background: #0f172a; color: white;">
-                <button class="btn-main" style="background:#3b82f6" onclick="joinGame()">UNIRSE A PARTIDA 📱</button>
+                <input type="text" id="join-input" placeholder="CÓDIGO" maxlength="4" style="padding:12px; border-radius:10px; width:60%; text-align:center; font-size: 1.2rem; border: 1px solid #475569; background: #0f172a; color: white; text-transform: uppercase;">
+                <button class="btn-main" style="background:#3b82f6" onclick="joinGame()">UNIRSE A SALA 📱</button>
             </div>
         </div>
 
         <div id="lobby-screen" class="screen">
-            <h2 id="lobby-status">Sala de Espera</h2>
+            <h2 id="lobby-status">Sala de Espera 🕒</h2>
             <div class="setup-box">
                 <div class="room-code" id="display-code">----</div>
                 <div id="qrcode"></div>
-                <p id="player-count">Esperando jugadores...</p>
+                <p id="player-count" style="font-weight: bold; color: var(--accent);">Esperando conexión...</p>
             </div>
             <div id="host-controls" style="display:none">
                 <div class="setup-box">
-                    <span>😈 Impostores: </span>
-                    <input type="number" id="num-imp" value="1" min="1" style="width:50px; text-align:center;">
+                    <span>Impostores: </span>
+                    <input type="number" id="num-imp" value="1" min="1" max="5" style="width:50px; padding:5px; border-radius:5px; text-align:center;">
                 </div>
                 <button id="btn-repartir" class="btn-main" onclick="distributeRoles()">¡REPARTIR ROLES! 📦</button>
             </div>
+            <p id="join-msg" style="font-size: 0.8rem; opacity: 0.7;">Pasa el código a tus amigos</p>
         </div>
 
         <div id="role-screen" class="screen">
-            <h3>Tu secreto:</h3>
-            <div class="card" id="my-card" onclick="this.style.filter='none'">
+            <h3 id="role-status-msg">Toca la carta para ver:</h3>
+            <div class="card" id="my-card" style="filter: blur(20px);" onclick="toggleCard()">
                 <div id="my-icon" class="role-icon">❓</div>
-                <h2 id="my-role">TOCA PARA VER</h2>
+                <h2 id="my-role" style="text-decoration: underline;">ROL SECRETO</h2>
                 <div id="my-word" class="word"></div>
             </div>
-            <p style="opacity:0.6; font-size:0.8rem;">No dejes que nadie vea tu pantalla</p>
-            <button class="btn-main" onclick="location.reload()" style="background:#475569">SALIR / NUEVA</button>
+            <p style="opacity:0.6; font-size:0.9rem;">No dejes que nadie vea</p>
+            <button class="btn-main" onclick="location.reload()" style="background:#475569; margin-top: 30px;">SALIR DE LA SALA</button>
         </div>
     </div>
 
     <script>
-        // BASE DE DATOS ULTRA MASIVA
         const DB = {
-            "Países 🌎": ["México", "España", "Brasil", "Japón", "Francia", "Italia", "Canadá", "Alemania", "Argentina", "China"],
-            "Animales 🦁": ["León", "Tigre", "Elefante", "Lobo", "Delfín", "Águila", "Gorila", "Zorro", "Panda", "Cebra"],
-            "Comida 🍕": ["Pizza", "Tacos", "Sushi", "Hamburguesa", "Pasta", "Pastel", "Ensalada", "Nuggets", "Donas"],
-            "Objetos 🏠": ["Reloj", "Espejo", "Silla", "Escoba", "Lámpara", "Televisión", "Computadora", "Sofá"]
+            "Países 🌎": ["México", "España", "Brasil", "Japón", "Francia", "Italia", "Canadá", "Alemania", "Argentina", "China", "Egipto", "Rusia", "Australia", "Chile", "Colombia"],
+            "Animales 🦁": ["León", "Tigre", "Elefante", "Lobo", "Delfín", "Águila", "Gorila", "Zorro", "Panda", "Cebra", "Jirafa", "Tiburón", "Pingüino", "Canguro", "Serpiente"],
+            "Comida 🍕": ["Pizza", "Tacos", "Sushi", "Hamburguesa", "Pasta", "Pastel", "Ensalada", "Nuggets", "Donas", "Burrito", "Lasagna", "Ramen", "Nacho", "Ceviche", "Sandwich"],
+            "Cine y TV 🎬": ["Marvel", "Star Wars", "Harry Potter", "Batman", "Pokémon", "Minecraft", "Fortnite", "Disney", "Pixar", "Avatar", "Stranger Things", "Matrix", "Los Simpsons", "Shrek", "Titanic"]
         };
 
-        let pubnub, myChannel, isHost = false, myId = "P-" + Math.random().toString(36).substr(2, 4).toUpperCase();
+        let pubnub, myChannel, isHost = false, myId = "P-" + Math.random().toString(36).substr(2, 5).toUpperCase();
         let players = [];
 
         function initPubNub(channel) {
-            // Usando llaves de PubNub actualizadas
             pubnub = new PubNub({
                 publishKey: 'pub-c-4638a1f8-084b-449e-b996-039c381f887f',
                 subscribeKey: 'sub-c-10902830-67c8-4721-91a9-d65e23616618',
@@ -88,28 +88,32 @@
             pubnub.addListener({
                 message: (m) => {
                     const data = m.message;
-                    if (data.type === "ping" && isHost) {
+                    // Lógica para que el Host registre jugadores
+                    if (data.type === "join" && isHost) {
                         if (!players.includes(data.from)) {
                             players.push(data.from);
                             updateLobby();
-                            // El host responde con un pong para confirmar al nuevo
-                            pubnub.publish({ channel: myChannel, message: { type: "pong", players: players } });
+                            // El host grita la lista actualizada
+                            pubnub.publish({ channel: myChannel, message: { type: "sync", list: players } });
                         }
                     }
-                    if (data.type === "pong" && !isHost) {
-                        players = data.players;
+                    // Lógica para que los jugadores reciban la lista del Host
+                    if (data.type === "sync") {
+                        players = data.list;
                         updateLobby();
                     }
-                    if (data.type === "assign_role") {
+                    // Recibir Roles
+                    if (data.type === "assign") {
                         showRole(data.roles[myId]);
                     }
                 }
             });
 
-            // Si no soy host, aviso que entré
-            if (!isHost) {
-                pubnub.publish({ channel: myChannel, message: { type: "ping", from: myId } });
-            }
+            // Grito de entrada (repetir hasta ser escuchado)
+            let joinInterval = setInterval(() => {
+                if (players.includes(myId)) clearInterval(joinInterval);
+                else pubnub.publish({ channel: myChannel, message: { type: "join", from: myId } });
+            }, 1500);
         }
 
         function hostGame() {
@@ -122,7 +126,7 @@
             const qr = qrcode(0, 'M');
             qr.addData(window.location.origin + window.location.pathname + '?room=' + code);
             qr.make();
-            document.getElementById('qrcode').innerHTML = qr.createImgTag(4);
+            document.getElementById('qrcode').innerHTML = qr.createImgTag(5);
             
             showScreen('lobby-screen');
             initPubNub(code);
@@ -131,54 +135,56 @@
 
         function joinGame() {
             const code = document.getElementById('join-input').value.toUpperCase();
-            if (code.length !== 4) return alert("Código inválido");
+            if (code.length !== 4) return alert("Código de 4 letras");
             document.getElementById('display-code').innerText = code;
+            document.getElementById('join-msg').innerText = "Conectando con el anfitrión...";
             showScreen('lobby-screen');
             initPubNub(code);
         }
 
         function updateLobby() {
             document.getElementById('player-count').innerText = `Jugadores conectados: ${players.length}`;
+            if (players.length >= 3) document.getElementById('lobby-status').innerText = "¡Listos para jugar! ✅";
         }
 
         function distributeRoles() {
-            if (players.length < 3) return alert("Se necesitan al menos 3 jugadores");
+            if (players.length < 3) return alert("Mínimo 3 personas para jugar");
             
-            let numImp = parseInt(document.getElementById('num-imp').value);
             const cats = Object.keys(DB);
             const cat = cats[Math.floor(Math.random() * cats.length)];
             const words = [...DB[cat]];
             const secret = words[Math.floor(Math.random() * words.length)];
 
             let rolesDist = {};
-            let tempPlayers = [...players];
-            
-            // Elegir Impostores
-            for (let i = 0; i < numImp; i++) {
-                if (tempPlayers.length === 0) break;
-                let idx = Math.floor(Math.random() * tempPlayers.length);
-                let pId = tempPlayers.splice(idx, 1)[0];
+            let pool = [...players];
+            let nImp = parseInt(document.getElementById('num-imp').value);
+
+            // Asignar Impostor
+            for(let i=0; i<nImp; i++) {
+                if(pool.length === 0) break;
+                let idx = Math.floor(Math.random() * pool.length);
+                let pId = pool.splice(idx, 1)[0];
                 rolesDist[pId] = { role: "IMPOSTOR", icon: "😈", word: "Cat: " + cat };
             }
-
-            // Resto Ciudadanos
-            tempPlayers.forEach(pId => {
+            // Asignar Ciudadanos
+            pool.forEach(pId => {
                 rolesDist[pId] = { role: "CIUDADANO", icon: "😇", word: secret };
             });
 
-            pubnub.publish({
-                channel: myChannel,
-                message: { type: "assign_role", roles: rolesDist }
-            });
+            pubnub.publish({ channel: myChannel, message: { type: "assign", roles: rolesDist } });
         }
 
         function showRole(data) {
             if (!data) return;
             showScreen('role-screen');
-            document.getElementById('my-card').style.filter = 'blur(15px)';
             document.getElementById('my-icon').innerText = data.icon;
             document.getElementById('my-role').innerText = data.role;
             document.getElementById('my-word').innerText = data.word;
+        }
+
+        function toggleCard() {
+            const card = document.getElementById('my-card');
+            card.style.filter = (card.style.filter === 'none') ? 'blur(20px)' : 'none';
         }
 
         function showScreen(id) {
@@ -186,11 +192,11 @@
             document.getElementById(id).classList.add('active');
         }
 
-        // Auto-unirse por URL
+        // Auto-join
         const params = new URLSearchParams(window.location.search);
         if (params.has('room')) {
             document.getElementById('join-input').value = params.get('room');
-            setTimeout(joinGame, 500);
+            setTimeout(joinGame, 1000);
         }
     </script>
 </body>
