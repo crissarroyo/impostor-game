@@ -153,7 +153,7 @@
     </div>
 
     <!-- Versión Beta -->
-    <div class="version">beta 0.8.4.8</div>
+    <div class="version">beta 0.8.4.9</div>
 
     <script>
         const DB = {
@@ -181,6 +181,7 @@
         let selectedCategories = Object.keys(DB);
         let fullRoles = {};
         let hasPublishedRolesToSpectators = false;
+        let maxPlayers = 10;
 
         function initCategories() {
             const list = document.getElementById('categories-list');
@@ -222,6 +223,7 @@
             if (mode === 'host') {
                 isHost = true;
                 code = Math.random().toString(36).substr(2, 4).toUpperCase();
+                maxPlayers = parseInt(document.getElementById('max-players').value) || 10;
             } else if (mode !== 'reconnect') {
                 code = document.getElementById('join-input').value.toUpperCase();
                 if (code.length !== 4) return alert("Código inválido.");
@@ -229,22 +231,42 @@
             channel = code;
             localStorage.setItem('channel', channel);
 
-            document.getElementById('display-code').innerText = channel;
-            showScreen('lobby-screen');
-            document.getElementById('spinner').style.display = 'block';
-
             pubnub = new PubNub({
                 publishKey: 'demo',
                 subscribeKey: 'demo',
                 userId: myId
             });
 
+            if (mode !== 'host') {
+                checkRoomSizeBeforeJoin(() => {
+                    subscribeToChannel();
+                });
+            } else {
+                subscribeToChannel();
+            }
+        }
+
+        function checkRoomSizeBeforeJoin(callback) {
+            pubnub.hereNow({ channels: [channel] }, (s, r) => {
+                if (r && r.totalOccupancy >= maxPlayers) {
+                    alert("Sala llena. Máximo: " + maxPlayers + ".");
+                    showScreen('home-screen');
+                } else {
+                    callback();
+                }
+            });
+        }
+
+        function subscribeToChannel() {
+            document.getElementById('display-code').innerText = channel;
+            showScreen('lobby-screen');
+            document.getElementById('spinner').style.display = 'block';
+
             pubnub.addListener({
                 status: (s) => {
                     if (s.category === "PNConnectedCategory") {
                         console.log("Conectado a PubNub.");
                         setPlayerState();
-                        checkRoomSize();
                         updatePlayersList();
                         document.getElementById('spinner').style.display = 'none';
                         refreshInterval = setInterval(updatePlayersList, 5000);
@@ -310,7 +332,7 @@
 
             pubnub.subscribe({ channels: [channel], withPresence: true });
 
-            if (isHost && mode !== 'reconnect') {
+            if (isHost) {
                 const qr = qrcode(0, 'M');
                 const baseUrl = window.location.origin + window.location.pathname;
                 qr.addData(baseUrl + "?room=" + channel);
@@ -324,22 +346,6 @@
                 state: { name: playerName },
                 channels: [channel]
             }).then(() => console.log("Estado set: " + playerName + "."));
-        }
-
-        function checkRoomSize() {
-            pubnub.hereNow({ channels: [channel], includeState: true }, (s, r) => {
-                if (r && r.channels && r.channels[channel]) {
-                    const count = r.channels[channel].occupancy;
-                    const max = parseInt(document.getElementById('max-players').value || 10);
-                    if (count > max) {
-                        alert("Sala llena. Máximo: " + max + ".");
-                        pubnub.unsubscribe({ channels: [channel] });
-                        showScreen('home-screen');
-                    }
-                } else {
-                    alert("Error verificando sala.");
-                }
-            });
         }
 
         function updatePlayersList() {
@@ -401,9 +407,9 @@
                 citizens.push(id);
             });
 
-            activePlayers = [...players];
+            activePlayers = Object.keys(roles);
             fullRoles = roles;
-            pubnub.publish({ channel: channel, message: { type: "assign", roles: roles } });
+            pubnub.publish({ channel: channel, message: { type: "assign", roles: roles, activePlayers: activePlayers } });
         }
 
         function handleAssignRoles(msg) {
@@ -414,6 +420,7 @@
                 document.getElementById('my-icon').innerText = data.icon;
                 document.getElementById('my-role').innerText = data.role;
                 document.getElementById('my-word').innerText = data.word;
+                activePlayers = msg.activePlayers;
                 showScreen('role-screen');
                 gamePhase = 'roles';
                 if (isHost) document.getElementById('host-start-timer').style.display = 'block';
@@ -471,6 +478,7 @@
             });
             startVoteTimer(30);
             if (isHost) pubnub.publish({ channel: channel, message: { type: "phase_update", status: "Votación en progreso... 🗳️" } });
+            if (isHost) setTimeout(publishResults, 30000);
         }
 
         function startVoteTimer(duration) {
@@ -482,7 +490,6 @@
                 if (--timer < 0) {
                     clearInterval(voteTimerInterval);
                     display.innerText = "00:00";
-                    if (isHost) publishResults();
                 }
             }, 1000);
         }
