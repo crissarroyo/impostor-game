@@ -17,9 +17,11 @@
         .screen { display: none; }
         .active { display: block; }
         .input-dark { background: #0f172a; color: white; border: 1px solid #475569; padding: 10px; border-radius: 8px; width: 100%; box-sizing: border-box; margin-top: 5px; font-size: var(--font-size-base); }
+        .input-number { width: 60px; padding-right: 30px; } /* Ajuste para flechas */
         .card { width: 260px; height: 350px; background: #f8fafc; border-radius: 25px; margin: 20px auto; color: #1e293b; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 5px solid var(--primary); filter: blur(25px); transition: 0.3s; }
         .word { font-size: 2rem; color: #3b82f6; font-weight: 900; text-transform: uppercase; margin-top: 10px; border-bottom: 4px solid; }
         .timer { font-size: 3rem; font-weight: bold; color: var(--accent); margin: 10px 0; }
+        .vote-timer { font-size: 1.5rem; color: var(--accent); margin: 10px 0; }
         /* Spinner */
         .spinner { display: none; margin: 20px auto; border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid var(--accent); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -39,6 +41,7 @@
         /* Categories */
         .categories-list { max-height: 200px; overflow-y: auto; }
         .categories-list label { display: block; }
+        .btn-small { padding: 5px 10px; border-radius: 5px; font-size: 0.9rem; margin: 0 5px; background: #3b82f6; color: white; border: none; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -50,9 +53,9 @@
                 <label>Tu Nombre: <input type="text" id="player-name" placeholder="Ej: Juan" class="input-dark" maxlength="15" required></label><br><br>
                 <div id="host-config">
                     <div class="setup-box">
-                        <label>📏 Máx Jugadores: <input type="number" id="max-players" value="10" min="3" max="20" class="input-dark" style="width: 50px;"></label><br><br>
-                        <label>😈 Impostores: <input type="number" id="num-imp" value="1" min="1" class="input-dark" style="width: 50px;"></label><br><br>
-                        <label>🤡 Charlatanes: <input type="number" id="num-char" value="0" min="0" class="input-dark" style="width: 50px;"></label><br><br>
+                        <label>📏 Máx Jugadores: <input type="number" id="max-players" value="10" min="3" max="20" class="input-dark input-number"></label><br><br>
+                        <label>😈 Impostores: <input type="number" id="num-imp" value="1" min="1" class="input-dark input-number"></label><br><br>
+                        <label>🤡 Charlatanes: <input type="number" id="num-char" value="0" min="0" class="input-dark input-number"></label><br><br>
                         <label>⏱ Tiempo por Ronda: 
                             <select id="round-time" class="input-dark" style="width: 100px;">
                                 <option value="30">30 seg</option>
@@ -60,7 +63,7 @@
                                 <option value="120">2 min</option>
                             </select>
                         </label><br><br>
-                        <label>Categorías: <button onclick="toggleAllCategories(true)">Seleccionar Todas</button> <button onclick="toggleAllCategories(false)">Deseleccionar Todas</button></label>
+                        <label>Categorías: <button class="btn-small" onclick="toggleAllCategories(true)">Todas</button> <button class="btn-small" onclick="toggleAllCategories(false)">Ninguna</button></label>
                         <div class="categories-list" id="categories-list"></div>
                     </div>
                 </div>
@@ -69,6 +72,7 @@
                 <input type="text" id="join-input" placeholder="CÓDIGO" maxlength="4" class="input-dark" style="text-align:center; text-transform: uppercase;">
                 <button class="btn-main" style="background:#3b82f6" onclick="startSession('join')">UNIRSE A SALA 📱</button>
             </div>
+            <button class="btn-main" style="background: #475569; margin-top: 20px;" onclick="showScreen('instructions-screen')">Instrucciones 📜</button>
         </div>
 
         <div id="lobby-screen" class="screen">
@@ -80,7 +84,7 @@
                 <p id="player-count" style="font-weight: bold;">Jugadores conectados: 0 👥</p>
                 <ul id="player-list" class="player-list"></ul>
             </div>
-            <button class="btn-main" onclick="distributeRoles()">¡REPARTIR ROLES! 📦</button>
+            <div id="host-distribute" style="display:none"><button class="btn-main" onclick="distributeRoles()">¡REPARTIR ROLES! 📦</button></div>
         </div>
 
         <div id="role-screen" class="screen">
@@ -100,7 +104,7 @@
             <h2>¡Vota por el Sospechoso! 🗳️</h2>
             <div class="setup-box">
                 <ul id="vote-list" class="player-list"></ul>
-                <p id="vote-status">Espera a que todos voten... ⏱</p>
+                <p id="vote-status">Espera a que todos voten... ⏱ <span id="vote-timer-display" class="vote-timer">00:30</span></p>
             </div>
             <button class="btn-main" onclick="exitGame()" style="background:#475569">SALIR 🚪</button>
         </div>
@@ -144,10 +148,8 @@
         </div>
     </div>
 
-    <button style="position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%); background: #475569; color: white; border: none; padding: 10px; border-radius: 20px; cursor: pointer;" onclick="showScreen('instructions-screen')">Instrucciones 📜</button>
-
     <!-- Versión Beta -->
-    <div class="version">beta 0.8.4.5</div>
+    <div class="version">beta 0.8.4.6</div>
 
     <script>
         const DB = {
@@ -169,7 +171,7 @@
         };
 
         let pubnub, channel, isHost = false, myId = localStorage.getItem('myId') || "P-" + Math.floor(Math.random() * 999999), playerName = localStorage.getItem('playerName') || "";
-        let players = [], playersMap = {}, activePlayers = [], refreshInterval, myRole = {}, votes = {}, votedPlayers = new Set(), timerInterval;
+        let players = [], playersMap = {}, activePlayers = [], refreshInterval, myRole = {}, votes = {}, votedPlayers = new Set(), timerInterval, voteTimerInterval;
         let gamePhase = 'lobby'; // lobby, roles, round, voting, results, game_over
         let impostors = [], charlatans = [], citizens = [], eliminated = [], roundTime = 60, isSpectator = false;
         let selectedCategories = Object.keys(DB);
@@ -202,14 +204,6 @@
         // Chequear reconexión al load
         window.addEventListener('load', () => {
             initCategories();
-            const storedChannel = localStorage.getItem('channel');
-            const storedPhase = localStorage.getItem('gamePhase') || 'lobby';
-            if (storedChannel && playerName && storedPhase !== 'game_over') {
-                if (confirm(`¿Desea reconectar a la sala ${storedChannel}?`)) {
-                    channel = storedChannel;
-                    startSession('reconnect');
-                }
-            }
         });
 
         function startSession(mode) {
@@ -248,7 +242,7 @@
                         updatePlayersList();
                         document.getElementById('spinner').style.display = 'none';
                         refreshInterval = setInterval(updatePlayersList, 5000);
-                        if (mode === 'reconnect') syncGameState();
+                        if (isHost) document.getElementById('host-distribute').style.display = 'block';
                     } else if (s.category === "PNNetworkDownCategory") {
                         alert("Conexión perdida. Reintentando...");
                         pubnub.reconnect();
@@ -265,7 +259,6 @@
                     } else if (msg.type === "start_round") {
                         startLocalTimer(msg.time);
                         gamePhase = 'round';
-                        localStorage.setItem('gamePhase', gamePhase);
                     } else if (msg.type === "vote") {
                         if (isHost || isSpectator) {
                             votes[msg.target] = (votes[msg.target] || 0) + 1;
@@ -405,7 +398,6 @@
                 document.getElementById('my-word').innerText = data.word;
                 showScreen('role-screen');
                 gamePhase = 'roles';
-                localStorage.setItem('gamePhase', gamePhase);
                 if (isHost) document.getElementById('host-start-timer').style.display = 'block';
                 else document.getElementById('wait-host').style.display = 'block';
             }
@@ -444,7 +436,6 @@
             }
             showScreen('voting-screen');
             gamePhase = 'voting';
-            localStorage.setItem('gamePhase', gamePhase);
             votes = {};
             votedPlayers = new Set();
             const voteList = document.getElementById('vote-list');
@@ -460,8 +451,22 @@
                 li.appendChild(btn);
                 voteList.appendChild(li);
             });
-            setTimeout(() => { if (isHost && votedPlayers.size < activePlayers.length) publishResults(); }, 30000);
+            startVoteTimer(30);
             if (isHost) pubnub.publish({ channel: channel, message: { type: "phase_update", status: "Votación en progreso... 🗳️" } });
+        }
+
+        function startVoteTimer(duration) {
+            const display = document.getElementById('vote-timer-display');
+            let timer = duration;
+            voteTimerInterval = setInterval(() => {
+                let secs = timer % 60;
+                display.innerText = `00:${secs < 10 ? '0' : ''}${secs}`;
+                if (--timer < 0) {
+                    clearInterval(voteTimerInterval);
+                    display.innerText = "00:00";
+                    if (isHost) publishResults();
+                }
+            }, 1000);
         }
 
         function sendVote(target, btn) {
@@ -496,7 +501,6 @@
         function showResults(votesData, mostVoted, eliminatedId) {
             showScreen('results-screen');
             gamePhase = 'results';
-            localStorage.setItem('gamePhase', gamePhase);
             const resultsList = document.getElementById('results-list');
             resultsList.innerHTML = '';
             const maxVotes = Math.max(...Object.values(votesData), 1); // Evitar división por 0
@@ -536,7 +540,6 @@
                 document.getElementById('spectator-status').innerText = "Espera nueva ronda... ⏳";
             }
             gamePhase = 'roles';
-            localStorage.setItem('gamePhase', gamePhase);
             if (isHost) pubnub.publish({ channel: channel, message: { type: "phase_update", status: "Espera nueva ronda... ⏳" } });
         }
 
@@ -550,8 +553,6 @@
             showScreen('game-over-screen');
             document.getElementById('game-result').innerText = `¡${winner} ganan! ${winner === 'Ciudadanos' ? '😇' : '😈'}`;
             if (isHost) document.getElementById('host-restart').style.display = 'block';
-            gamePhase = 'game_over';
-            localStorage.setItem('gamePhase', gamePhase);
         }
 
         function restartGame() {
