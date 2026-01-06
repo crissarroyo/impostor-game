@@ -324,6 +324,9 @@
             <div id="spectator-status"></div>
             <ul id="spectator-roles" class="player-list"></ul>
             <ul id="spectator-vote-progress" class="player-list"></ul>
+            <div id="host-spectator-controls" style="display:none">
+                <button class="btn-main" id="spectator-next-round-btn" style="background:#22c55e; display:none;" onclick="nextRound()">SIGUIENTE RONDA 🔄</button>
+            </div>
             <button class="btn-main" onclick="exitGame()" style="background:#475569">SALIR 🚪</button>
         </div>
 
@@ -352,7 +355,7 @@
         </div>
     </div>
 
-    <div class="version">beta 0.8.6.3</div>
+    <div class="version">beta 0.8.6.4</div>
 
     <script>
         const DB = {
@@ -904,10 +907,15 @@
                 showScreen('spectator-screen');
                 document.getElementById('spectator-status').innerText = "Votación en progreso... 🗳️";
                 updateSpectatorVoteProgress();
-                if (isHost) pubnub.publish({
-                    channel: channel,
-                    message: { type: "phase_update", status: "Votación en progreso... 🗳️" }
-                });
+                
+                // Host espectador mantiene control
+                if (isHost) {
+                    document.getElementById('host-spectator-controls').style.display = 'block';
+                    pubnub.publish({
+                        channel: channel,
+                        message: { type: "phase_update", status: "Votación en progreso... 🗳️" }
+                    });
+                }
                 return;
             }
 
@@ -1080,7 +1088,8 @@
         }
 
         function showResults(votesData, mostVoted, eliminatedId, eliminatedRole) {
-            if (isSpectator) {
+            // Actualizar primero para espectadores existentes
+            if (isSpectator && myId !== eliminatedId) {
                 if (eliminatedRole === "EMPATE") {
                     document.getElementById('spectator-status').innerText = `⚖️ EMPATE en la votación. Nueva ronda sin eliminaciones.`;
                 } else {
@@ -1115,19 +1124,49 @@
 
             if (eliminatedRole === "EMPATE") {
                 document.getElementById('most-voted').innerHTML = `⚖️ <strong>EMPATE</strong> en la votación.<br>Nueva ronda sin eliminaciones.`;
+                if (isHost && impostors.length > 0 && activePlayers.length > 2) {
+                    document.getElementById('host-next-round').style.display = 'block';
+                }
             } else {
                 const roleIcon = eliminatedRole === "IMPOSTOR" ? "😈" : (eliminatedRole === "CHARLATÁN" ? "🤡" : "😇");
                 document.getElementById('most-voted').innerText = `Expulsado: ${mostVoted} ${roleIcon} (${eliminatedRole})`;
 
                 if (myId === eliminatedId) {
                     isSpectator = true;
-                    showScreen('spectator-screen');
-                    document.getElementById('spectator-status').innerText = `Has sido expulsado ${roleIcon} (${eliminatedRole}). Observa el juego.`;
+                    
+                    // Si el host fue eliminado, mantenerlo como espectador pero sigue controlando
+                    if (isHost) {
+                        console.log("Host eliminado - pasa a modo espectador pero mantiene control");
+                        showScreen('spectator-screen');
+                        document.getElementById('spectator-status').innerText = `Has sido expulsado ${roleIcon} (${eliminatedRole}).\n\nObservas el juego como HOST ESPECTADOR y mantienes el control.`;
+                        
+                        // Mostrar controles de host en modo espectador
+                        document.getElementById('host-spectator-controls').style.display = 'block';
+                        
+                        // Publicar roles para que todos los espectadores vean
+                        if (!hasPublishedRolesToSpectators) {
+                            pubnub.publish({
+                                channel: channel,
+                                message: { type: "spectator_roles", roles: fullRoles }
+                            });
+                            hasPublishedRolesToSpectators = true;
+                        }
+                        
+                        // Mostrar botón de siguiente ronda si aplica
+                        if (impostors.length > 0 && activePlayers.length > 2) {
+                            document.getElementById('spectator-next-round-btn').style.display = 'block';
+                        }
+                    } else {
+                        showScreen('spectator-screen');
+                        document.getElementById('spectator-status').innerText = `Has sido expulsado ${roleIcon} (${eliminatedRole}). Observa el juego.`;
+                    }
+                    return; // No mostrar más controles en results-screen
                 }
-            }
-
-            if (isHost && impostors.length > 0 && activePlayers.length > 2) {
-                document.getElementById('host-next-round').style.display = 'block';
+                
+                // Para jugadores activos (no eliminados)
+                if (isHost && impostors.length > 0 && activePlayers.length > 2) {
+                    document.getElementById('host-next-round').style.display = 'block';
+                }
             }
 
             if (isHost) pubnub.publish({
@@ -1148,6 +1187,11 @@
             if (isSpectator) {
                 showScreen('spectator-screen');
                 document.getElementById('spectator-status').innerText = "Nueva ronda iniciando... ⏳";
+                
+                // Si el host es espectador, permitirle controlar la ronda
+                if (isHost) {
+                    document.getElementById('spectator-status').innerText = "Nueva ronda iniciando... ⏳ (Eres el host espectador)";
+                }
             } else {
                 showScreen('role-screen');
                 document.getElementById('timer-display').style.display = 'none';
@@ -1184,6 +1228,7 @@
 
         function gameOver(winner, reason) {
             showScreen('game-over-screen');
+            gamePhase = 'game_over';
             document.getElementById('game-result').innerText = `¡${winner} ganan! ${winner === 'Ciudadanos' ? '😇' : '😈'}`;
             document.getElementById('game-over-reason').innerText = reason;
             if (isHost) document.getElementById('host-restart').style.display = 'block';
