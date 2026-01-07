@@ -145,6 +145,8 @@
             list-style: none;
             padding: 0;
             opacity: 0.8;
+            height: 200px;
+            overflow-y: auto;
         }
         ul.player-list li {
             margin: 5px 0;
@@ -356,7 +358,7 @@
         </div>
     </div>
 
-    <div class="version">beta 0.8.6.5</div>
+    <div class="version">beta 0.8.6.6</div>
 
     <script>
         const DB = {
@@ -549,13 +551,8 @@
                             console.log("Eliminated:", eliminated);
                             
                             // VALIDACIÓN ESTRICTA: El voto DEBE ser para alguien en activePlayers Y NO en eliminated
-                            if (!activePlayers.includes(msg.target)) {
-                                console.error("❌ VOTO RECHAZADO: Target no está en activePlayers");
-                                return;
-                            }
-                            
-                            if (eliminated.includes(msg.target)) {
-                                console.error("❌ VOTO RECHAZADO: Target está en eliminated");
+                            if (!activePlayers.includes(msg.target) || eliminated.includes(msg.target)) {
+                                console.error("❌ VOTO RECHAZADO: Target no válido");
                                 return;
                             }
                             
@@ -942,11 +939,7 @@
             console.log("My ID:", myId);
             
             // FILTRO ESTRICTO: Solo mostrar jugadores que están en activePlayers Y NO en eliminated
-            const votablePlayers = activePlayers.filter(id => {
-                const canVote = id !== myId && !eliminated.includes(id);
-                console.log(`Jugador ${playersMap[id] || id} (${id}): canVote=${canVote}, isEliminated=${eliminated.includes(id)}`);
-                return canVote;
-            });
+            const votablePlayers = activePlayers.filter(id => id !== myId && !eliminated.includes(id));
             
             console.log("Votable Players:", votablePlayers);
             
@@ -1149,7 +1142,7 @@
                 if (myId === eliminatedId) {
                     isSpectator = true;
                     
-                    // Si el host fue eliminado, mantenerlo como espectador pero sigue controlando
+                    // Si el host fue eliminado, mantenerlo como espectador pero mantiene control
                     if (isHost) {
                         console.log("Host eliminado - pasa a modo espectador pero mantiene control");
                         showScreen('spectator-screen');
