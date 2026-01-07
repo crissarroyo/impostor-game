@@ -358,7 +358,7 @@
         </div>
     </div>
 
-    <div class="version">beta 0.8.6.6</div>
+    <div class="version">beta 0.8.6.7</div>
 
     <script>
         const DB = {
@@ -1090,6 +1090,20 @@
         }
 
         function showResults(votesData, mostVoted, eliminatedId, eliminatedRole) {
+            // Actualizar estado en todos los clientes
+            if (eliminatedRole !== "EMPATE" && !eliminated.includes(eliminatedId)) {
+                eliminated.push(eliminatedId);
+                activePlayers = activePlayers.filter(id => id !== eliminatedId);
+
+                if (eliminatedRole === "IMPOSTOR") {
+                    impostors = impostors.filter(id => id !== eliminatedId);
+                } else if (eliminatedRole === "CHARLATÁN") {
+                    charlatans = charlatans.filter(id => id !== eliminatedId);
+                } else {
+                    citizens = citizens.filter(id => id !== eliminatedId);
+                }
+            }
+
             // Actualizar primero para espectadores existentes
             if (isSpectator && myId !== eliminatedId) {
                 if (eliminatedRole === "EMPATE") {
