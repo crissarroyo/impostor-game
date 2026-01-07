@@ -325,7 +325,8 @@
             <ul id="spectator-roles" class="player-list"></ul>
             <ul id="spectator-vote-progress" class="player-list"></ul>
             <div id="host-spectator-controls" style="display:none">
-                <button class="btn-main" id="spectator-next-round-btn" style="background:#22c55e; display:none;" onclick="nextRound()">SIGUIENTE RONDA 🔄</button>
+                <button class="btn-main" id="spectator-next-round-btn" style="display:none;" onclick="nextRound()">SIGUIENTE RONDA 🔄</button>
+                <button class="btn-main" id="spectator-start-round-btn" style="display:none;" onclick="startRound()">¡INICIAR RONDA! ⏱</button>
             </div>
             <button class="btn-main" onclick="exitGame()" style="background:#475569">SALIR 🚪</button>
         </div>
@@ -355,7 +356,7 @@
         </div>
     </div>
 
-    <div class="version">beta 0.8.6.4</div>
+    <div class="version">beta 0.8.6.5</div>
 
     <script>
         const DB = {
@@ -531,8 +532,15 @@
                     if (msg.type === "assign") {
                         handleAssignRoles(msg);
                     } else if (msg.type === "start_round") {
-                        startLocalTimer(msg.time);
-                        gamePhase = 'round';
+                        if (!isSpectator) {
+                            startLocalTimer(msg.time);
+                            gamePhase = 'round';
+                        } else {
+                            document.getElementById('spectator-status').innerText = "Ronda en progreso... ⏳";
+                            if (isHost) {
+                                document.getElementById('spectator-start-round-btn').style.display = 'none';
+                            }
+                        }
                     } else if (msg.type === "vote") {
                         if (isHost || isSpectator) {
                             console.log("=== VOTO RECIBIDO EN HOST/SPECTATOR ===");
@@ -876,6 +884,7 @@
                 message: { type: "start_round", time: roundTime }
             });
             document.getElementById('host-start-timer').style.display = 'none';
+            if (isSpectator) document.getElementById('spectator-start-round-btn').style.display = 'none';
             if (isHost) pubnub.publish({
                 channel: channel,
                 message: { type: "phase_update", status: "Ronda en progreso... ⏳" }
@@ -1092,8 +1101,14 @@
             if (isSpectator && myId !== eliminatedId) {
                 if (eliminatedRole === "EMPATE") {
                     document.getElementById('spectator-status').innerText = `⚖️ EMPATE en la votación. Nueva ronda sin eliminaciones.`;
+                    if (isHost && impostors.length > 0 && activePlayers.length > 2) {
+                        document.getElementById('spectator-next-round-btn').style.display = 'block';
+                    }
                 } else {
                     document.getElementById('spectator-status').innerText = `Resultados: ${mostVoted} fue expulsado (${eliminatedRole})`;
+                    if (isHost && impostors.length > 0 && activePlayers.length > 2) {
+                        document.getElementById('spectator-next-round-btn').style.display = 'block';
+                    }
                 }
                 return;
             }
@@ -1177,6 +1192,7 @@
 
         function nextRound() {
             document.getElementById('host-next-round').style.display = 'none';
+            if (isSpectator) document.getElementById('spectator-next-round-btn').style.display = 'none';
             pubnub.publish({
                 channel: channel,
                 message: { type: "next_round" }
@@ -1191,6 +1207,7 @@
                 // Si el host es espectador, permitirle controlar la ronda
                 if (isHost) {
                     document.getElementById('spectator-status').innerText = "Nueva ronda iniciando... ⏳ (Eres el host espectador)";
+                    document.getElementById('spectator-start-round-btn').style.display = 'block';
                 }
             } else {
                 showScreen('role-screen');
@@ -1213,7 +1230,7 @@
             if (impostors.length === 0) {
                 winner = "Ciudadanos";
                 reason = "Todos los impostores han sido eliminados. 🎉";
-            } else if (activePlayers.length <= impostors.length) {
+            } else if (activePlayers.length - impostors.length <= impostors.length) {
                 winner = "Impostores";
                 reason = "Los impostores igualan o superan a los ciudadanos. 😈";
             }
